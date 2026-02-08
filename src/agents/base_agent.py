@@ -12,6 +12,13 @@ class BasePokerAgent:
         self.seed = seed
         self._random = Random(seed)
 
+    def game_start(self, start_state):
+        """
+        Called when the game starts.
+        Use this to create an internal database.
+        """
+        pass
+
     def decide_action(self, game_state):
         """
         Called when it is this bot's turn to act.

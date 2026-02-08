@@ -6,9 +6,22 @@ from random import Random
 
 
 class BasePokerAgent:
-    def __init__(self, name, seed):
+    def __init__(self, seed: int = None, name: str = "Base Agent"):
         self.name = name
+        self.seed = None
+        self._random = None
+        self.init_seed(seed)
+
+    def init_seed(self, seed: int):
+        self.seed = seed
         self._random = Random(seed)
+
+    def game_start(self, start_state):
+        """
+        Called when the game starts.
+        Use this to create an internal database.
+        """
+        pass
 
     def decide_action(self, game_state):
         """
@@ -24,6 +37,23 @@ class BasePokerAgent:
         Use this to update your internal database of opponent tendencies.
         """
         pass
+```
+
+Game Start:
+```python
+start_state = {
+    "initial_stack_per_player": 1000,
+    "player_count": 8,
+    "players": [
+        {
+            "player_id": 2,
+            "stack": 1000,
+            "order": 0, # Game plays clockwise 0 -> 1 -> 2 -> 3 -> ... -> 0
+            "game_status": "alive" # alive / eliminated
+        },
+        # ... other players
+    ],
+}
 ```
 
 Game state:
@@ -61,10 +91,10 @@ game_state = {
     # A list of everyone at the table (ordered by position relative to button)
     "players": [
         {
-            "agent_id": 0,
+            "player_id": 0,
             "stack": 900,
-            "status": "active",      # "active", "folded", "all-in"
-            "position": 0,        # 0 (Dealer), 1 (Small Blind), 2 (Big Blind), 3 (Under the Gun), 4...
+            "hand_status": "active",      # "active", "folded", "all-in"
+            "position": 0,        # Play order THIS hand. Dealer button moves every hand. 0 (Dealer), 1 (Small Blind), 2 (Big Blind), 3 (Under the Gun), 4...
             "current_bet_this_round": 20, # How much they put in this specific street
             "total_bet_this_hand": 50
         },
@@ -84,26 +114,35 @@ Hand history:
 ```python
 hand_history = {
     "community_cards": ['2h', '5d', '9s'],
-    "showdown_data": {
-        0: 
+    "showdown_data": [
         {
+            "player_id": 0,
             "hole_cards": ['Ah', 'Kh'],
             "hand_rank": 123123123,
-            "winning_pots": [0, 1]
+            "winning_pots": [0, 1],
+            "gain": 1200, # Positive for chips gained this hand, negative for chips lost this game
+            "stack": 2200, # Stack after this hand
+            "game_status": "alive"
         },
-        1: 
         {
+            "player_id": 1,
             "hole_cards": ['2c', '7d'],
             "hand_rank": 123123123,
-            "winning_pots": None
+            "winning_pots": None,
+            "gain": -200,
+            "stack": 0,
+            "game_status": "eliminated" # Player is eliminated when stack is reduced to 0
         },
-        2:
         {
-            "hole_cards": None,
+            "player_id": 2,
+            "hole_cards": None, # Folded earlier, cards remain a mystery
             "hand_rank": None,
-            "winning_pots": None
-        }, # Folded earlier, cards remain a mystery
-    },
+            "winning_pots": None,
+            "gain": -130,
+            "stack": 500,
+            "game_status": "alive"
+        }, 
+    ],
     "full_action_log": [...] # Complete list of every bet/check this hand
 }
 ```

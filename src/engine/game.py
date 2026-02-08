@@ -1,16 +1,23 @@
-from seed_gen import generate_game_seed, derive_deck_seed, derive_order_seed, derive_agent_seeds
-from player import Player
+from .seed_gen import generate_game_seed, derive_deck_seed, derive_order_seed, derive_agent_seeds
+from .player import Player
 from treys import Card, Deck, Evaluator
 from random import Random
-from chip_stack import ChipStack
+from .chip_stack import ChipStack
 
 
 class PokerGame:
     def __init__(self, game_id: int, players: set[Player], initial_chips_per_player: int = 1000 ,game_seed: int = None):
+        if not (2 <= len(players) <= 10):
+            raise ValueError("Game requires between 2 and 10 players")
+
         self.game_id = game_id
         self.players = players
         self.game_seed = generate_game_seed(game_seed)
         self.hand_count = 0
+        self.dealer_button = 0
+        self.ante = 0
+        self.small_blind = 5
+        self.big_blind = 10
 
         # Derive seeds from the game seed
         deck_seed = derive_deck_seed(self.game_seed)
@@ -36,7 +43,36 @@ class PokerGame:
         for player in self.player_list:
             player.stack.add(self.bank.pop(initial_chips_per_player))
 
-        self.step()
+        self.game_start(initial_chips_per_player)
+        self.run_game()
 
-    def step(self):
-        pass
+    def game_start(self, initial_chips_per_player: int):
+        player_states = []
+        for order, player in enumerate(self.player_list):
+            player_state = {
+                "player_id": player.player_id,
+                "stack": player.stack.amount,
+                "order": order,
+                "game_status": player.game_status
+            }
+            player_states.append(player_state)
+
+        start_state = {
+            "initial_stack_per_player": initial_chips_per_player,
+            "player_count": len(self.players),
+            "players": player_states
+        }
+
+        for player in self.player_list:
+            player.game_start(start_state)
+
+    def run_game(self):
+        winner = None
+        while True:
+            hand_players = [player for player in self.player_list if player.game_status == 'alive']
+            if len(hand_players) == 1:
+                winner = hand_players[0]
+                break
+
+
+

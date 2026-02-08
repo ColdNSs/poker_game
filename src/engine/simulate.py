@@ -1,5 +1,5 @@
-from player import Player
-from game import PokerGame
+from .player import Player
+from .game import PokerGame
 from agents.input_agent import InputAgent
 from treys import Card, Evaluator
 
