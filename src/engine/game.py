@@ -3,7 +3,7 @@ from player import Player
 from treys import Card, Deck, Evaluator
 from random import Random
 from chip_stack import ChipStack
-
+from copy import deepcopy
 
 class PokerGame:
     def __init__(self, game_id: int, players: set[Player], initial_chips_per_player: int = 1000 ,game_seed: int = None):
@@ -60,19 +60,21 @@ class PokerGame:
         start_state = {
             "initial_stack_per_player": initial_chips_per_player,
             "player_count": len(self.players),
+            "your_id": None,
             "players": player_states
         }
 
         for player in self.player_list:
-            player.game_start(start_state)
+            isolated_state = deepcopy(start_state)
+            isolated_state['your_id'] = player.player_id
+            player.game_start(isolated_state)
 
     def run_game(self):
         winner = None
         while True:
             hand_players = [player for player in self.player_list if player.game_status == 'alive']
-            if len(hand_players) == 1:
-                winner = hand_players[0]
-                break
+            assert 2 <= len(hand_players) <= 10
+            
 
 
 
