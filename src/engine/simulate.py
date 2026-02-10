@@ -11,7 +11,7 @@ if __name__ == '__main__':
         player_list.append(Player(i, InputAgent(name=f"Input Agent {i}")))
     players = set(player_list)
 
-    game = PokerGame(0, players, 1000, game_seed)
+    game = PokerGame(0, players, 200, game_seed)
 
     print(game.game_seed)
     for player in game.player_list:

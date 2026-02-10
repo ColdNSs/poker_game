@@ -6,18 +6,19 @@ from chip_stack import ChipStack
 from copy import deepcopy
 
 class PokerGame:
-    def __init__(self, game_id: int, players: set[Player], initial_chips_per_player: int = 1000 ,game_seed: int = None):
+    def __init__(self, game_id: int, players: set[Player], initial_chips_per_player: int = 200 ,game_seed: int = None):
         if not (2 <= len(players) <= 10):
             raise ValueError("Game requires between 2 and 10 players")
 
         self.game_id = game_id
         self.players = players
         self.game_seed = generate_game_seed(game_seed)
-        self.hand_count = 0
+        self.hand_count = 0     # +1 after each hand
+        self.round_count = 0    # +1 after each time dealer button returns to its initial position
         self.dealer_button = 0
         self.ante = 0
-        self.small_blind = 5
-        self.big_blind = 10
+        self.small_blind = 1
+        self.big_blind = 2
 
         # Derive seeds from the game seed
         deck_seed = derive_deck_seed(self.game_seed)
@@ -72,9 +73,9 @@ class PokerGame:
     def run_game(self):
         winner = None
         while True:
-            hand_players = [player for player in self.player_list if player.game_status == 'alive']
+            # Rotate the player list so that dealer is at index 0 in the new list
+            hand_players = self.player_list[self.dealer_button:] + self.player_list[:self.dealer_button]
+            # Exclude eliminated players
+            hand_players = [player for player in hand_players if player.game_status == 'alive']
             assert 2 <= len(hand_players) <= 10
-            
-
-
 
