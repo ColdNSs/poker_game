@@ -1,16 +1,17 @@
-from .player import Player
-from .game import PokerGame
+from player import Player
+from game import PokerGame
 from agents.input_agent import InputAgent
 from treys import Card, Evaluator
 
 
 if __name__ == '__main__':
+    game_seed = None
     player_list = []
     for i in range(8):
         player_list.append(Player(i, InputAgent(name=f"Input Agent {i}")))
     players = set(player_list)
 
-    game = PokerGame(0, players, 1000, None)
+    game = PokerGame(0, players, 1000, game_seed)
 
     print(game.game_seed)
     for player in game.player_list:

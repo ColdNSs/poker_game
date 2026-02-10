@@ -7,7 +7,7 @@ class InputAgent(BasePokerAgent):
 
     def decide_action(self, game_state):
         print(game_state)
-        valid_actions = ('match', 'increase', 'fold', 'idle')
+        valid_actions = ('match', 'increase', 'fold')
         action = ''
         amount = None
         while action not in valid_actions:

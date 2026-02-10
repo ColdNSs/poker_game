@@ -1,5 +1,5 @@
 from agents.base_agent import BasePokerAgent
-from .chip_stack import ChipStack
+from chip_stack import ChipStack
 
 
 class Player:

@@ -1,8 +1,8 @@
-from .seed_gen import generate_game_seed, derive_deck_seed, derive_order_seed, derive_agent_seeds
-from .player import Player
+from seed_gen import generate_game_seed, derive_deck_seed, derive_order_seed, derive_agent_seeds
+from player import Player
 from treys import Card, Deck, Evaluator
 from random import Random
-from .chip_stack import ChipStack
+from chip_stack import ChipStack
 
 
 class PokerGame:
@@ -44,7 +44,7 @@ class PokerGame:
             player.stack.add(self.bank.pop(initial_chips_per_player))
 
         self.game_start(initial_chips_per_player)
-        self.run_game()
+        # self.run_game()
 
     def game_start(self, initial_chips_per_player: int):
         player_states = []

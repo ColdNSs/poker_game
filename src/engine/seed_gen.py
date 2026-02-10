@@ -1,4 +1,4 @@
-import random
+import secrets
 import hmac
 import hashlib
 import struct
@@ -18,7 +18,7 @@ def generate_game_seed(seed: int = None) -> int:
     if seed:
         return abs(seed) & 0xFFFFFFFF
     # Else: generate a seed between 0 and 2**32 - 1
-    return random.randint(0, 0xFFFFFFFF)
+    return secrets.randbelow(2 ** 32)
 
 def derive_seed(game_seed: int, namespace: int) -> int:
     """
