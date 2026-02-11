@@ -66,7 +66,7 @@ game_state = {
     "hand_id": 0,
     "current_active_players": [2, 0, 1], # Active players in order
     "community_cards": ['2h', '5d', '9s'], # Empty [] pre-flop
-    "current_stage": "flop",   # "pre-flop", "flop", "turn", "river"
+    "current_stage": "flop",   # "preflop", "flop", "turn", "river"
     "pots": [
         {
             "pot_id": 0,

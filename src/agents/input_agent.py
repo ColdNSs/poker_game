@@ -12,16 +12,15 @@ class InputAgent(BasePokerAgent):
         print(game_state)
         valid_actions = ('match', 'increase', 'fold')
         action = ''
-        amount = None
+        amount = 0
         while action not in valid_actions:
-            action = input("Input your action (match/increase/fold/idle):")
+            action = input("Input your action (match/increase/fold):")
         if action == 'increase':
             while not amount:
-                amount_input = input("Input the amount of chips you want to increase to:")
+                amount_input = input("Input the amount of chips you want to increase:")
                 try:
                     amount = abs(int(amount_input))
                 except:
                     pass
-        if not amount:
-            amount = 0
+
         return {'action': action, 'amount': amount}
