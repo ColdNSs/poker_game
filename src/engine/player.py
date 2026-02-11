@@ -12,6 +12,9 @@ class Player:
         self.hand_status = 'active' # active / folded / all-in
         self.unresolved_chips = 0 # Total committed chips this stage
 
+    def __repr__(self):
+        return f"{self.name} ({self.agent.name})"
+
     def game_start(self, start_state):
         self.agent.game_start(start_state)
 

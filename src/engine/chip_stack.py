@@ -3,6 +3,9 @@ class ChipStack:
         assert amount >= 0
         self._amount = amount
 
+    def __repr__(self):
+        return f"Stack of {self.amount}"
+
     @property
     def amount(self) -> int:
         return self._amount

@@ -8,6 +8,9 @@ class BasePokerAgent:
         self._random = None
         self.init_seed(seed)
 
+    def __repr__(self):
+        return self.name
+
     def init_seed(self, seed: int):
         self.seed = seed
         self._random = Random(seed)
