@@ -43,7 +43,14 @@ class Player:
             raise ValueError("Wrong hole card amount")
         self.hole_cards = hole_cards
 
+    def resolve(self, amount: int):
+        if amount <= self.unresolved_chips:
+            raise ValueError(f"Cannot resolve more than current unresolved chips"
+                             f"{amount} > {self.unresolved_chips}")
+        self.unresolved_chips -= amount
+
     def is_actable(self, max_bet):
+        assert self.unresolved_chips <= max_bet
         if self.hand_status == 'folded' or self.hand_status == 'all_in':
             return False
 

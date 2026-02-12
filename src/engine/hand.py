@@ -53,7 +53,7 @@ class Hand:
         yield 3 % n     # Under the Gun
 
     # Deal cards, usually start with small blind
-    def deal_cards(self, index: int):
+    def deal_hole_cards(self, index: int):
         self.deck.shuffle()
 
         for _ in range(len(self.player_list)):
@@ -65,9 +65,12 @@ class Hand:
             if index == len(self.player_list):
                 index = 0
 
-        self.community_cards = self.deck.draw(5)
+    def deal_community_cards(self, amount: int):
+        if amount < 0:
+            raise ValueError("Cannot deal negative amount of community cards")
+        self.community_cards = self.community_cards + self.deck.draw(amount)
         to_str = Card.ints_to_pretty_str(self.community_cards)
-        print(f"Dealt community cards: {to_str}")
+        print(f"All community cards: {to_str}")
 
     # Extremely messy codes here. Should exist a better implementation
     def add_to_pots(self, stack: ChipStack):
@@ -89,8 +92,9 @@ class Hand:
             else:
                 # Current pot will not be empty, add chips to it
                 for player in non_all_iners + all_iners + [least_committed]:
-                    self.pot_stacks[-1]['stack'].add(stack.pop(pot_increase))
-                    player.unresolved_chips -= pot_increase
+                    amount = min(pot_increase, player.unresolved_chips)
+                    self.pot_stacks[-1]['stack'].add(stack.pop(amount))
+                    player.resolve(amount)
 
             # Create a new side pot that excludes this player
             new_side_pot = {
@@ -102,7 +106,7 @@ class Hand:
         # For players who don't all-in just move their chips to the current pot
         for player in non_all_iners:
             self.pot_stacks[-1]['stack'].add(stack.pop(player.unresolved_chips))
-            player.unresolved_chips = 0
+            player.resolve(player.unresolved_chips)
 
         assert stack.amount == 0
         print(self.pot_stacks)
@@ -110,31 +114,81 @@ class Hand:
     def get_max_bet(self):
         return max(p.unresolved_chips for p in self.player_list)
 
-    def is_betting_round_over(self):
-        # Folded players are out; All-In players are locked in
-        active_players = [p for p in self.player_list
-                          if p.hand_status != 'folded'
-                          and p.hand_status != 'all_in']
+    def betting_stage(self, stack: ChipStack, current_player: int, bet_to_call: int, min_raise: int):
+        retry_count = 0     # Times failed to find the next active player
+        while retry_count < len(self.player_list) - 1:
+            # Pick the next player in order
+            player = self.player_list[current_player]
+            actable = player.is_actable(bet_to_call)
+            if actable:
 
-        # Edge Case: If 0 or 1 active players remain, the betting round is essentially over
-        # The game might continue to showdown if there are all-ins, but no more betting acts
-        if len(active_players) < 2:
+                game_status = {'your_id': player.player_id}
+                action = self.player_list[current_player].decide_action(game_status)
+
+                if action['action'] == 'fold':
+                    player.fold()
+
+                elif action['action'] == 'match':
+                    player.bet(stack, bet_to_call - player.unresolved_chips)
+
+                elif action['action'] == 'increase':
+                    can_raise = player.can_raise
+                    # Call first
+                    player.bet(stack, bet_to_call - player.unresolved_chips)
+                    if can_raise:
+                        # This is the amount player wants to increase by, not including how much they have to call
+                        amount = max(action['amount'], min_raise)
+                        # Raise
+                        actual_raise = player.bet(stack, amount)
+                        # When it's a full raise
+                        if actual_raise >= min_raise:
+                            min_raise = actual_raise
+                            # Open raise for everyone else
+                            for p in self.player_list:
+                                if p is player:
+                                    continue
+                                p.set_raise()
+                        # Update bet to call. It only goes up never goes down
+                        bet_to_call = max(self.get_max_bet(), bet_to_call)
+
+                else:
+                    raise InvalidActionError(f"Undefined action '{action['action']}'")
+
+            # If player is still active, next retry starts with retry count set to 0
+            if actable and not player.hand_status == 'folded':
+                retry_count = 0
+            else:
+                retry_count += 1
+
+            current_player += 1
+            if current_player == len(self.player_list):
+                current_player = 0
+
+    def get_competing_players(self):
+        """Returns all players who have NOT folded."""
+        return [p for p in self.player_list if p.hand_status != 'folded']
+
+    def check_uncontested_win(self):
+        """
+        Checks if only one player remains.
+        If yes, awards them the pot immediately.
+        Returns True if the hand ended, False otherwise.
+        """
+        competing_players = self.get_competing_players()
+
+        if len(competing_players) == 1:
+            winner = competing_players[0]
+            for pot in self.pot_stacks:
+                if pot['stack'].amount == 0:
+                    continue
+                assert winner in pot['eligible_players']
+                winner.stack.add(pot['stack'].pop(pot['stack'].amount))
+            # Log the win
+            print(f"Hand ended. {winner} wins by everyone else folding")
+
             return True
 
-        # Determine the "Target Amount" to match
-        max_bet = self.get_max_bet()
-
-        # Check every active player
-        for player in active_players:
-            # Condition A: Have they matched the money?
-            if player.unresolved_chips != max_bet:
-                return False
-
-            # Condition B: Can they perform a raise?
-            if not player.can_raise:
-                return False
-
-        return True
+        return False
 
     def collect_antes(self):
         stack = ChipStack()
@@ -160,55 +214,102 @@ class Hand:
         self.player_list[bb].set_raise()
 
         # Deal cards, starting with small blind
-        self.deal_cards(index=sb)
+        self.deal_hole_cards(index=sb)
 
-        # Start a betting stage
+        # Start Pre-flop betting stage
         current_player = utg
-        retry_count = 0         # Times failed to find the next actable player
-        max_bet = self.big_blind
+        bet_to_call = self.big_blind    # During Pre-flop, min bet to call = big blind, no matter how much the BB paid
         min_raise = self.big_blind
-        while retry_count < len(self.player_list) - 1:
-            # Pick the next player in order
-            player = self.player_list[current_player]
-            if player.is_actable(max_bet):
-                retry_count = 0
-
-                game_status = {}
-                action = self.player_list[current_player].decide_action(game_status)
-
-                if action['action'] == 'fold':
-                    player.fold()
-
-                elif action['action'] == 'match':
-                    player.bet(stack, max_bet - player.unresolved_chips)
-
-                else:
-                    raise InvalidActionError(f"Undefined action '{action['action']}'")
-
-                max_bet = self.get_max_bet()
-            else:
-                retry_count += 1
-
-            current_player += 1
-            if current_player == len(self.player_list):
-                current_player = 0
-
-
+        self.betting_stage(stack, current_player, bet_to_call, min_raise)
 
         self.add_to_pots(stack)
 
-    def run_hand(self):
+    def run_flop(self):
+        stack = ChipStack()
+        _, sb, _, _ = self.get_positions()
+
+        for player in self.player_list:
+            player.stage_start()
+
+        # Deal 3 community cards
+        self.deal_community_cards(3)
+
+        # Start Flop betting stage
+        current_player = sb # Starts with the SB and find the next active player
+        bet_to_call = 0
+        min_raise = self.big_blind
+        self.betting_stage(stack, current_player, bet_to_call, min_raise)
+
+        self.add_to_pots(stack)
+
+    def run_turn(self):
+        stack = ChipStack()
+        _, sb, _, _ = self.get_positions()
+
+        for player in self.player_list:
+            player.stage_start()
+
+        # Deal 1 community card
+        self.deal_community_cards(1)
+
+        # Start Turn betting stage
+        current_player = sb  # Starts with the SB and find the next active player
+        bet_to_call = 0
+        min_raise = self.big_blind
+        self.betting_stage(stack, current_player, bet_to_call, min_raise)
+
+        self.add_to_pots(stack)
+
+    def run_river(self):
+        stack = ChipStack()
+        _, sb, _, _ = self.get_positions()
+
+        for player in self.player_list:
+            player.stage_start()
+
+        # Deal 1 community card
+        self.deal_community_cards(1)
+
+        # Start River betting stage
+        current_player = sb  # Starts with the SB and find the next active player
+        bet_to_call = 0
+        min_raise = self.big_blind
+        self.betting_stage(stack, current_player, bet_to_call, min_raise)
+
+        self.add_to_pots(stack)
+
+    def showdown(self):
         pass
+
+    def run_hand(self):
+        self.collect_antes()
+        stages = [
+            self.run_preflop,
+            self.run_flop,
+            self.run_turn,
+            self.run_river
+        ]
+
+        # Iterate through each stage
+        for stage_method in stages:
+            stage_method()  # Execute the deal and betting for this stage
+
+            # Did everyone fold?
+            if self.check_uncontested_win():
+                return  # Exit run_hand immediately
+
+        # If we survive all stages without a fold-win, it's a showdown
+        self.showdown()
 
 
 if __name__ == '__main__':
     alice = Player(0, InputAgent(), "Alice")
-    bob = Player(0, InputAgent(), "Bob")
-    clementine = Player(0, InputAgent(), "Clementine")
-    dave = Player(0, InputAgent(), "Dave")
+    bob = Player(1, InputAgent(), "Bob")
+    clementine = Player(2, InputAgent(), "Clementine")
+    dave = Player(3, InputAgent(), "Dave")
 
-    alice.stack.add(1)
-    bob.stack.add(5)
+    alice.stack.add(10)
+    bob.stack.add(6)
     clementine.stack.add(10)
     dave.stack.add(10)
 
@@ -218,3 +319,6 @@ if __name__ == '__main__':
 
     example_hand.collect_antes()
     example_hand.run_preflop()
+    example_hand.check_uncontested_win()
+    for p in example_list:
+        print(p, p.stack)

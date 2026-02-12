@@ -14,13 +14,17 @@ class InputAgent(BasePokerAgent):
         action = ''
         amount = 0
         while action not in valid_actions:
-            action = input("Input your action (match/increase/fold):")
-        if action == 'increase':
-            while not amount:
-                amount_input = input("Input the amount of chips you want to increase:")
-                try:
-                    amount = abs(int(amount_input))
-                except:
-                    pass
+            cmd = input("Input your action (match/increase/fold):")
+            to_list = cmd.split(' ')
+            action = to_list[0]
+            if action == 'increase':
+                if len(to_list) > 1:
+                    if to_list[1].isdigit():
+                        amount = abs(int(to_list[1]))
+                if not amount:
+                    action = ''
 
         return {'action': action, 'amount': amount}
+
+    def hand_ended(self, hand_history):
+        print(hand_history)
