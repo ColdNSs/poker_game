@@ -44,7 +44,7 @@ class Player:
         self.hole_cards = hole_cards
 
     def resolve(self, amount: int):
-        if amount <= self.unresolved_chips:
+        if amount > self.unresolved_chips:
             raise ValueError(f"Cannot resolve more than current unresolved chips"
                              f"{amount} > {self.unresolved_chips}")
         self.unresolved_chips -= amount

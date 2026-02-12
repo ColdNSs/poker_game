@@ -2,8 +2,11 @@ from .base_agent import BasePokerAgent
 
 
 class InputAgent(BasePokerAgent):
-    def __init__(self, seed: int = None, name: str = "Input Agent"):
+    def __init__(self, seed: int = None, name: str = "Input Agent", dollar_per_chip: int = 5):
+        if dollar_per_chip < 1:
+            raise ValueError("Dollar to chip ratio should at least be 1")
         super().__init__(seed, name)
+        self.dollar_per_chip = dollar_per_chip
 
     def game_start(self, start_state):
         print(start_state)

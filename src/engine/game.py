@@ -4,6 +4,7 @@ from treys import Card, Deck, Evaluator
 from random import Random
 from chip_stack import ChipStack
 from copy import deepcopy
+from hand import Hand
 
 class PokerGame:
     def __init__(self, game_id: int, players: set[Player], initial_chips_per_player: int = 200 ,game_seed: int = None):
@@ -19,6 +20,7 @@ class PokerGame:
         self.ante = 0
         self.small_blind = 1
         self.big_blind = 2
+        self.alive_count = len(self.players)
 
         # Derive seeds from the game seed
         deck_seed = derive_deck_seed(self.game_seed)
@@ -72,10 +74,40 @@ class PokerGame:
 
     def run_game(self):
         winner = None
-        while True:
+        while not winner:
             # Rotate the player list so that dealer is at index 0 in the new list
             hand_players = self.player_list[self.dealer_button:] + self.player_list[:self.dealer_button]
             # Exclude eliminated players
             hand_players = [player for player in hand_players if player.game_status == 'alive']
             assert 2 <= len(hand_players) <= 10
+
+            hand = Hand(hand_players,
+                        self.hand_count,
+                        self.round_count,
+                        self.ante,
+                        self.small_blind,
+                        self.big_blind,
+                        self.deck)
+            hand.run_hand()
+
+            self.hand_count += 1
+
+            for player in hand_players:
+                player.check_alive()
+
+            alive_players = [player for player in hand_players if player.game_status == 'alive']
+            self.alive_count = len(alive_players)
+            assert self.alive_count > 0
+            if self.alive_count == 1:
+                winner = alive_players[0]
+
+            found_next_alive_player = False
+            while not found_next_alive_player:
+                self.dealer_button += 1
+                if self.dealer_button == len(self.player_list):
+                    self.dealer_button = 0
+                    self.round_count += 1
+
+                if self.player_list[self.dealer_button] == 'alive':
+                    found_next_alive_player = True
 

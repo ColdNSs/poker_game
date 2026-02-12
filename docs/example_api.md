@@ -64,6 +64,7 @@ game_state = {
 
     # --- PUBLIC SHARED INFO ---
     "hand_id": 0,
+    "round_id": 0,
     "current_active_players": [2, 0, 1], # Active players in order
     "community_cards": ['2h', '5d', '9s'], # Empty [] pre-flop
     "current_stage": "flop",   # "preflop", "flop", "turn", "river"
@@ -122,7 +123,6 @@ hand_history = {
             "winning_pots": [0, 1],
             "gain": 1200, # Positive for chips gained this hand, negative for chips lost this game
             "stack": 2200, # Stack after this hand
-            "game_status": "alive"
         },
         {
             "player_id": 1,
@@ -130,8 +130,7 @@ hand_history = {
             "hand_rank": 123123123,
             "winning_pots": None,
             "gain": -200,
-            "stack": 0,
-            "game_status": "eliminated" # Player is eliminated when stack is reduced to 0
+            "stack": 0 # Player is eliminated when stack is reduced to 0
         },
         {
             "player_id": 2,
@@ -139,8 +138,7 @@ hand_history = {
             "hand_rank": None,
             "winning_pots": None,
             "gain": -130,
-            "stack": 500,
-            "game_status": "alive"
+            "stack": 500
         }, 
     ],
     "full_action_log": [...] # Complete list of every bet/check this hand

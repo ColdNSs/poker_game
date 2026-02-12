@@ -1,6 +1,6 @@
 from player import Player
 from chip_stack import ChipStack
-from treys import Card, Deck
+from treys import Card, Deck, Evaluator
 from agents.input_agent import InputAgent
 
 
@@ -21,6 +21,7 @@ class Hand:
             deck: Deck
     ):
         assert 2 <= len(player_list) <= 10
+        assert len(player_list) == len(set(player_list)) # No duplicated players
         self.player_list = player_list
         self.hand_id = hand_id
         self.round_id = round_id
@@ -30,14 +31,15 @@ class Hand:
         self.deck = deck
         self.community_cards = []
         self.pot_stacks = []
+        self.evaluator = Evaluator()
         main_pot = {
             'stack': ChipStack(),
             'eligible_players': self.player_list.copy()
         }
         self.pot_stacks.append(main_pot)
 
-    # Yield indexes of Dealer, Small Blind, Big Blind and Under the Gun
     def get_positions(self):
+        """Yields indexes of Dealer, Small Blind, Big Blind and Under the Gun."""
         n = len(self.player_list)
 
         if n == 2:
@@ -52,8 +54,8 @@ class Hand:
         yield 2         # Big Blind
         yield 3 % n     # Under the Gun
 
-    # Deal cards, usually start with small blind
     def deal_hole_cards(self, index: int):
+        """Deals cards, usually start with small blind."""
         self.deck.shuffle()
 
         for _ in range(len(self.player_list)):
@@ -66,14 +68,23 @@ class Hand:
                 index = 0
 
     def deal_community_cards(self, amount: int):
+        """Deals community cards."""
         if amount < 0:
             raise ValueError("Cannot deal negative amount of community cards")
         self.community_cards = self.community_cards + self.deck.draw(amount)
         to_str = Card.ints_to_pretty_str(self.community_cards)
         print(f"All community cards: {to_str}")
 
+    def get_game_status(self, player_index: int):
+        if not 0 <= player_index <= len(self.player_list) - 1:
+            raise ValueError("Player out of index")
+        game_status = {
+            
+        }
+
     # Extremely messy codes here. Should exist a better implementation
     def add_to_pots(self, stack: ChipStack):
+        """Resolves chips from a temporary stack."""
         contributors = [player for player in self.player_list if player.unresolved_chips != 0]
         all_iners = [player for player in contributors if player.hand_status == 'all_in']
         non_all_iners = [player for player in contributors if player not in all_iners]
@@ -115,6 +126,8 @@ class Hand:
         return max(p.unresolved_chips for p in self.player_list)
 
     def betting_stage(self, stack: ChipStack, current_player: int, bet_to_call: int, min_raise: int):
+        if len(self.get_active_players()) < 2:
+            return
         retry_count = 0     # Times failed to find the next active player
         while retry_count < len(self.player_list) - 1:
             # Pick the next player in order
@@ -154,7 +167,7 @@ class Hand:
                 else:
                     raise InvalidActionError(f"Undefined action '{action['action']}'")
 
-            # If player is still active, next retry starts with retry count set to 0
+            # If player acted and did not fold, next retry starts with retry count set to 0
             if actable and not player.hand_status == 'folded':
                 retry_count = 0
             else:
@@ -168,6 +181,10 @@ class Hand:
         """Returns all players who have NOT folded."""
         return [p for p in self.player_list if p.hand_status != 'folded']
 
+    def get_active_players(self):
+        """Returns all players who are active."""
+        return [p for p in self.player_list if p.hand_status == 'active']
+
     def check_uncontested_win(self):
         """
         Checks if only one player remains.
@@ -175,10 +192,12 @@ class Hand:
         Returns True if the hand ended, False otherwise.
         """
         competing_players = self.get_competing_players()
+        assert len(competing_players) > 0
 
         if len(competing_players) == 1:
             winner = competing_players[0]
-            for pot in self.pot_stacks:
+            while self.pot_stacks:
+                pot = self.pot_stacks.pop()
                 if pot['stack'].amount == 0:
                     continue
                 assert winner in pot['eligible_players']
@@ -279,7 +298,45 @@ class Hand:
         self.add_to_pots(stack)
 
     def showdown(self):
-        pass
+        assert len(self.community_cards) == 5
+        competing_players = self.get_competing_players()
+        assert len(competing_players) > 1
+
+        while self.pot_stacks:
+            pot = self.pot_stacks.pop()
+            if pot['stack'].amount == 0:
+                continue
+            eligible_players = list(set(competing_players) & set(pot['eligible_players']))
+            player_scores = []
+            for player in eligible_players:
+                assert len(player.hole_cards) == 2
+                score = self.evaluator.evaluate(player.hole_cards, self.community_cards)
+                player_scores.append((player, score))
+            player_scores.sort(key=lambda x: x[1])
+            best_score = player_scores[0][1]
+            winners = [p for p, score in player_scores if score == best_score]
+            pot_amount = pot['stack'].amount
+            num_winners = len(winners)
+            split_amount = pot_amount // num_winners
+            odd_chips = pot_amount % num_winners
+
+            for winner in winners:
+                winner.stack.add(pot['stack'].pop(split_amount))
+                print(f"{winner.name} wins {split_amount} from the pot")
+
+            if odd_chips > 0:
+                print(f"Distributing {odd_chips} odd chips...")
+                _, index, _, _ = self.get_positions()
+                while odd_chips:
+                    player = self.player_list[index]
+                    if player in winners:
+                        player.stack.add(pot['stack'].pop(1))
+                        odd_chips -= 1
+                    index += 1
+                    if index == len(self.player_list):
+                        index = 0
+
+            assert pot['stack'].amount == 0
 
     def run_hand(self):
         self.collect_antes()
@@ -309,7 +366,7 @@ if __name__ == '__main__':
     dave = Player(3, InputAgent(), "Dave")
 
     alice.stack.add(10)
-    bob.stack.add(6)
+    bob.stack.add(9)
     clementine.stack.add(10)
     dave.stack.add(10)
 
@@ -317,8 +374,6 @@ if __name__ == '__main__':
     example_deck = Deck()
     example_hand = Hand(example_list, 0, 0, 3, 1, 2, example_deck)
 
-    example_hand.collect_antes()
-    example_hand.run_preflop()
-    example_hand.check_uncontested_win()
-    for p in example_list:
-        print(p, p.stack)
+    example_hand.run_hand()
+    for example_player in example_list:
+        print(example_player, example_player.stack)
