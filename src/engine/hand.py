@@ -125,6 +125,7 @@ class Hand:
             if amount == 0:
                 continue
             eligible_players = list(set(competing_players) & set(pot['eligible_players']))
+            eligible_players = [p.player_id for p in eligible_players]
             pot_dict = {
                 'amount': amount,
                 'eligible_players': eligible_players
@@ -520,10 +521,10 @@ if __name__ == '__main__':
     clementine = Player(2, InputAgent(), "Clementine")
     dave = Player(3, InputAgent(), "Dave")
 
-    alice.stack.add(10)
+    alice.stack.add(20)
     bob.stack.add(9)
-    clementine.stack.add(10)
-    dave.stack.add(10)
+    clementine.stack.add(20)
+    dave.stack.add(20)
 
     example_list = [alice, bob, clementine, dave]
     example_deck = Deck()
