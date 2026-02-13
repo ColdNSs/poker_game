@@ -11,6 +11,7 @@ class Player:
         self.game_status = 'alive' # alive / eliminated
         self.hand_status = 'active' # active / folded / all-in
         self.unresolved_chips = 0 # Total committed chips this stage
+        self.total_bet_this_hand = 0
         self.can_raise = True
         self.hole_cards = []
 
@@ -33,6 +34,7 @@ class Player:
             self.game_status = 'eliminated'
             return
         self.hand_status = 'active'
+        self.total_bet_this_hand = 0
 
     def stage_start(self):
         assert self.unresolved_chips == 0
@@ -72,13 +74,14 @@ class Player:
         if amount < 0:
             raise ValueError("Cannot bet negative chips")
 
-        # Required bet is larger than what left in stack, automatically go all-in
+        # Required bets is larger than what left in stack, automatically go all-in
         if amount >= self.stack.amount:
             amount = self.stack.amount
-            self.hand_status = 'all_in'
+            self.hand_status = 'all-in'
 
         stack.add(self.stack.pop(amount))
         self.unresolved_chips += amount
+        self.total_bet_this_hand += amount
         self.can_raise = False
         return amount
 

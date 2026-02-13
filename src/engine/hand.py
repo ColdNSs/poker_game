@@ -4,8 +4,8 @@ from treys import Card, Deck, Evaluator
 from agents.input_agent import InputAgent
 
 
-class InvalidActionError(Exception):
-    """Raised when an agent returns an invalid or illegal action."""
+class InvalidStringError(Exception):
+    """Raised when an invalid or illegal string is found."""
     pass
 
 
@@ -32,6 +32,7 @@ class Hand:
         self.community_cards = []
         self.pot_stacks = []
         self.evaluator = Evaluator()
+        self.hand_log = []
         main_pot = {
             'stack': ChipStack(),
             'eligible_players': self.player_list.copy()
@@ -75,18 +76,106 @@ class Hand:
         to_str = Card.ints_to_pretty_str(self.community_cards)
         print(f"All community cards: {to_str}")
 
-    def get_game_status(self, player_index: int):
-        if not 0 <= player_index <= len(self.player_list) - 1:
-            raise ValueError("Player out of index")
-        game_status = {
-            
+    def log(self, player: Player, stack_before: int, action: str, cost: int, stage: str):
+        if action not in ['bet', 'check', 'fold', 'call', 'raise', 'all-in']:
+            raise InvalidStringError(f"Undefined action '{action}'")
+        if stage not in ['pre-flop', 'flop', 'turn', 'river']:
+            raise InvalidStringError(f"Undefined stage '{stage}'")
+        log_item = {
+            'player_id': player.player_id,
+            'stack_before': stack_before,
+            'action': action,
+            'cost': cost,
+            'stage': stage
         }
+        self.hand_log.append(log_item)
+
+    def get_stage_name(self):
+        stages = {0: 'pre-flop', 3: 'flop', 4: 'turn', 5: 'river'}
+        current_stage = stages[len(self.community_cards)]
+        return current_stage
+
+    def get_player_status(self, player: Player):
+        player_status = {
+            'position': self.player_list.index(player),
+            'player_id': player.player_id,
+            'stack': player.stack.amount,
+            'hand_status': player.hand_status,
+            'current_bet_this_stage': player.unresolved_chips,
+            'total_bet_this_hand': player.total_bet_this_hand
+        }
+        return player_status
+
+    def get_game_status(self, player: Player, bet_to_call: int, min_raise: int):
+        current_stage = self.get_stage_name()
+
+        hole_cards = []
+        for hole_card in player.hole_cards:
+            hole_cards.append(Card.int_to_str(hole_card))
+
+        pots = []
+        competing_players = self.get_competing_players()
+        for pot in self.pot_stacks:
+            amount = pot['stack'].amount
+            if amount == 0:
+                continue
+            eligible_players = list(set(competing_players) & set(pot['eligible_players']))
+            pot_dict = {
+                'amount': amount,
+                'eligible_players': eligible_players
+            }
+            pots.append(pot_dict)
+
+        players = []
+        for p in self.player_list:
+            players.append(self.get_player_status(p))
+
+        current_stage_logs = [
+            log for log in self.hand_log
+            if log['stage'] == current_stage
+        ]
+        n = len(self.player_list)
+        recent_history = current_stage_logs[-n:]
+
+        game_status = {
+            # --- PRIVATE INFO (Only this player sees this) ---
+            "hole_cards": hole_cards,  # Your 2 cards
+
+            # --- PUBLIC SHARED INFO ---
+            "hand_id": self.hand_id,
+            "round_id": self.round_id,
+            "community_cards": self.community_cards,
+            "current_stage": current_stage,  # "pre-flop", "flop", "turn", "river"
+            "pots": pots,
+
+            # --- YOUR STATUS ---
+            "your_status": self.get_player_status(player),
+
+            # --- BETTING MATH ---
+            "bet_to_call": bet_to_call,             # Bet you have to match if you want to call
+            "min_raise": min_raise,                 # Minimum amount to increase by if you want to raise
+            "cost_to_call": bet_to_call - player.unresolved_chips,  # How much you have to pay if you want to call
+            "min_cost_to_raise": bet_to_call - player.unresolved_chips + min_raise, # How much at least you have to pay if you want to raise
+            "small_blind": self.small_blind,        # Reference for sizing bets
+            "big_blind": self.big_blind,            # Reference for sizing bets
+            "ante": self.ante,                      # Reference for sizing bets
+
+            # --- PLAYER STATUS ---
+            # A list of everyone at the table (ordered by position)
+            "players": players,
+
+            # --- ACTION HISTORY (Crucial for detecting logic) ---
+            # A list of sequential actions in the current hand
+            "hand_log": recent_history
+        }
+
+        return game_status
 
     # Extremely messy codes here. Should exist a better implementation
     def add_to_pots(self, stack: ChipStack):
         """Resolves chips from a temporary stack."""
         contributors = [player for player in self.player_list if player.unresolved_chips != 0]
-        all_iners = [player for player in contributors if player.hand_status == 'all_in']
+        all_iners = [player for player in contributors if player.hand_status == 'all-in']
         non_all_iners = [player for player in contributors if player not in all_iners]
 
         # Sorted by total committed chips this stage, from high to low
@@ -135,19 +224,38 @@ class Hand:
             actable = player.is_actable(bet_to_call)
             if actable:
 
-                game_status = {'your_id': player.player_id}
+                game_status = self.get_game_status(player, bet_to_call, min_raise)
                 action = self.player_list[current_player].decide_action(game_status)
+                stack_before = player.stack.amount
+                bet_to_call_before = bet_to_call
+                cost = 0
+                action_name = 'none'
 
                 if action['action'] == 'fold':
                     player.fold()
+                    action_name = 'fold'
 
                 elif action['action'] == 'match':
-                    player.bet(stack, bet_to_call - player.unresolved_chips)
+                    cost = player.bet(stack, bet_to_call - player.unresolved_chips)
+
+                    if player.hand_status == 'all-in':
+                        action_name = 'all-in'
+                    elif bet_to_call_before == 0:
+                        action_name = 'check'
+                    else:
+                        action_name = 'call'
 
                 elif action['action'] == 'increase':
                     can_raise = player.can_raise
                     # Call first
-                    player.bet(stack, bet_to_call - player.unresolved_chips)
+                    cost = player.bet(stack, bet_to_call - player.unresolved_chips)
+
+                    # When player cannot raise it's just a call
+                    if player.hand_status == 'all-in':
+                        action_name = 'all-in'
+                    else:
+                        action_name = 'call'
+
                     if can_raise:
                         # This is the amount player wants to increase by, not including how much they have to call
                         amount = max(action['amount'], min_raise)
@@ -164,8 +272,19 @@ class Hand:
                         # Update bet to call. It only goes up never goes down
                         bet_to_call = max(self.get_max_bet(), bet_to_call)
 
+                        cost += actual_raise
+                        if player.hand_status == 'all-in':
+                            action_name = 'all-in'
+                        elif bet_to_call_before == 0:
+                            action_name = 'bet'
+                        else:
+                            action_name = 'raise'
+
                 else:
-                    raise InvalidActionError(f"Undefined action '{action['action']}'")
+                    raise InvalidStringError(f"Undefined action '{action['action']}'")
+
+                # Log the action
+                self.log(player, stack_before, action_name, cost, self.get_stage_name())
 
             # If player acted and did not fold, next retry starts with retry count set to 0
             if actable and not player.hand_status == 'folded':
@@ -377,3 +496,4 @@ if __name__ == '__main__':
     example_hand.run_hand()
     for example_player in example_list:
         print(example_player, example_player.stack)
+    print(example_hand.hand_log)

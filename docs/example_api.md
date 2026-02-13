@@ -65,38 +65,47 @@ game_state = {
     # --- PUBLIC SHARED INFO ---
     "hand_id": 0,
     "round_id": 0,
-    "current_active_players": [2, 0, 1], # Active players in order
     "community_cards": ['2h', '5d', '9s'], # Empty [] pre-flop
-    "current_stage": "flop",   # "preflop", "flop", "turn", "river"
+    "current_stage": "flop",   # "pre-flop", "flop", "turn", "river"
     "pots": [
         {
-            "pot_id": 0,
             "amount": 100,          # Total chips in this pot
             "eligible_players": [0,1,2]  # Player IDs who can win this pot
         },
         {
-            "pot_id": 1,
             "amount": 50,
             "eligible_players": [0,2]    # Players not all-in
         }
     ],
 
+    # --- YOUR STATUS ---
+    "your_status": {
+        "position": 0,  # Play order THIS hand. Dealer button moves every hand. 0 (Dealer), 1 (Small Blind), 2 (Big Blind), 3 (Under the Gun), 4...
+        "player_id": 0,
+        "stack": 900,
+        "hand_status": "active",  # "active", "folded", "all-in"
+        "current_bet_this_stage": 20,  # How much they put in this betting round
+        "total_bet_this_hand": 50
+    },
+    
     # --- BETTING MATH ---
-    "to_call": 20,             # Cost to stay in hand (0 means you can Check)
-    "min_raise": 40,           # Minimum total bet amount if you want to raise
-    "big_blind": 20,           # Reference for sizing bets
-    "ante": 10,                # Reference for sizing bets
+    "bet_to_call": 70,  # Bet you have to match if you want to call
+    "min_raise": 50,  # Minimum amount to increase by if you want to raise
+    "cost_to_call": 50, # How much you have to pay if you want to call
+    "min_cost_to_raise": 100, # How much at least you have to pay if you want to raise
+    "small_blind": 10, # Reference for sizing bets
+    "big_blind": 20,  # Reference for sizing bets
+    "ante": 10,  # Reference for sizing bets
 
     # --- PLAYER STATUS ---
-    "your_id": 0,
-    # A list of everyone at the table (ordered by position relative to button)
+    # A list of everyone at the table (ordered by position)
     "players": [
         {
+            "position": 0,        # Play order THIS hand. Dealer button moves every hand. 0 (Dealer), 1 (Small Blind), 2 (Big Blind), 3 (Under the Gun), 4...
             "player_id": 0,
             "stack": 900,
             "hand_status": "active",      # "active", "folded", "all-in"
-            "position": 0,        # Play order THIS hand. Dealer button moves every hand. 0 (Dealer), 1 (Small Blind), 2 (Big Blind), 3 (Under the Gun), 4...
-            "current_bet_this_round": 20, # How much they put in this specific street
+            "current_bet_this_stage": 20, # How much they put in this betting round
             "total_bet_this_hand": 50
         },
         # ... other players
@@ -105,8 +114,8 @@ game_state = {
     # --- ACTION HISTORY (Crucial for detecting logic) ---
     # A list of sequential actions in the current hand
     "hand_log": [
-        {"agent_id": 1, "stack_before": 900, "action": "bet", "amount": 10, "stage": "pre-flop"},
-        {"agent_id": 2, "stack_before":850, "action": "raise", "amount": 30, "stage": "pre-flop"},
+        {"player_id": 1, "stack_before": 900, "action": "bet", "cost": 20, "stage": "pre-flop"},
+        {"player_id": 2, "stack_before":850, "action": "raise", "cost": 30, "stage": "pre-flop"},
     ]
 }
 ```
