@@ -89,10 +89,10 @@ game_state = {
     },
     
     # --- BETTING MATH ---
-    "bet_to_call": 70,  # Bet you have to match if you want to call
-    "min_raise": 50,  # Minimum amount to increase by if you want to raise
-    "cost_to_call": 50, # How much you have to pay if you want to call
-    "min_cost_to_raise": 100, # How much at least you have to pay if you want to raise
+    "bet_to_match": 70,  # Bet you have to match if you want to check or call
+    "min_increase": 50,  # Minimum amount to increase by if you want to bet or raise
+    "cost_to_match": 50, # How much you have to pay if you want to check or call
+    "min_cost_to_increase": 100, # How much at least you have to pay if you want to bet or raise
     "small_blind": 10, # Reference for sizing bets
     "big_blind": 20,  # Reference for sizing bets
     "ante": 10,  # Reference for sizing bets

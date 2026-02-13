@@ -2,6 +2,7 @@ from player import Player
 from chip_stack import ChipStack
 from treys import Card, Deck, Evaluator
 from agents.input_agent import InputAgent
+from copy import deepcopy
 
 
 class InvalidStringError(Exception):
@@ -77,9 +78,9 @@ class Hand:
         print(f"All community cards: {to_str}")
 
     def log(self, player: Player, stack_before: int, action: str, cost: int, stage: str):
-        if action not in ['bet', 'check', 'fold', 'call', 'raise', 'all-in']:
+        if action not in ['ante', 'small-blind', 'big-blind', 'bet', 'check', 'fold', 'call', 'raise', 'all-in']:
             raise InvalidStringError(f"Undefined action '{action}'")
-        if stage not in ['pre-flop', 'flop', 'turn', 'river']:
+        if stage not in ['ante', 'pre-flop', 'flop', 'turn', 'river']:
             raise InvalidStringError(f"Undefined stage '{stage}'")
         log_item = {
             'player_id': player.player_id,
@@ -106,12 +107,16 @@ class Hand:
         }
         return player_status
 
-    def get_game_status(self, player: Player, bet_to_call: int, min_raise: int):
+    def get_game_state(self, player: Player, stack: ChipStack, bet_to_call: int, min_raise: int):
         current_stage = self.get_stage_name()
 
         hole_cards = []
         for hole_card in player.hole_cards:
             hole_cards.append(Card.int_to_str(hole_card))
+
+        community_cards = []
+        for community_card in self.community_cards:
+            community_cards.append(Card.int_to_str(community_card))
 
         pots = []
         competing_players = self.get_competing_players()
@@ -134,28 +139,29 @@ class Hand:
             log for log in self.hand_log
             if log['stage'] == current_stage
         ]
-        n = len(self.player_list)
-        recent_history = current_stage_logs[-n:]
+        # n = len(self.player_list)
+        # recent_history = current_stage_logs[-n:]
 
-        game_status = {
+        game_state = {
             # --- PRIVATE INFO (Only this player sees this) ---
             "hole_cards": hole_cards,  # Your 2 cards
 
             # --- PUBLIC SHARED INFO ---
             "hand_id": self.hand_id,
             "round_id": self.round_id,
-            "community_cards": self.community_cards,
+            "community_cards": community_cards,
             "current_stage": current_stage,  # "pre-flop", "flop", "turn", "river"
+            "stage_pot": stack.amount,
             "pots": pots,
 
             # --- YOUR STATUS ---
             "your_status": self.get_player_status(player),
 
             # --- BETTING MATH ---
-            "bet_to_call": bet_to_call,             # Bet you have to match if you want to call
-            "min_raise": min_raise,                 # Minimum amount to increase by if you want to raise
-            "cost_to_call": bet_to_call - player.unresolved_chips,  # How much you have to pay if you want to call
-            "min_cost_to_raise": bet_to_call - player.unresolved_chips + min_raise, # How much at least you have to pay if you want to raise
+            "bet_to_match": bet_to_call,             # Bet you have to match if you want to check or call
+            "min_increase": min_raise,                 # Minimum amount to increase by if you want to bet or raise
+            "cost_to_match": bet_to_call - player.unresolved_chips,  # How much you have to pay if you want to check or call
+            "min_cost_to_increase": bet_to_call - player.unresolved_chips + min_raise, # How much at least you have to pay if you want to bet or raise
             "small_blind": self.small_blind,        # Reference for sizing bets
             "big_blind": self.big_blind,            # Reference for sizing bets
             "ante": self.ante,                      # Reference for sizing bets
@@ -166,10 +172,12 @@ class Hand:
 
             # --- ACTION HISTORY (Crucial for detecting logic) ---
             # A list of sequential actions in the current hand
-            "hand_log": recent_history
+            "hand_log": current_stage_logs
         }
 
-        return game_status
+        isolated_state = deepcopy(game_state)
+
+        return isolated_state
 
     # Extremely messy codes here. Should exist a better implementation
     def add_to_pots(self, stack: ChipStack):
@@ -224,8 +232,8 @@ class Hand:
             actable = player.is_actable(bet_to_call)
             if actable:
 
-                game_status = self.get_game_status(player, bet_to_call, min_raise)
-                action = self.player_list[current_player].decide_action(game_status)
+                game_state = self.get_game_state(player, stack, bet_to_call, min_raise)
+                action = self.player_list[current_player].decide_action(game_state)
                 stack_before = player.stack.amount
                 bet_to_call_before = bet_to_call
                 cost = 0
@@ -257,8 +265,8 @@ class Hand:
                         action_name = 'call'
 
                     if can_raise:
-                        # This is the amount player wants to increase by, not including how much they have to call
-                        amount = max(action['amount'], min_raise)
+                        # This is the amount player wants to increase by
+                        amount = max(action['amount'] - cost, min_raise)
                         # Raise
                         actual_raise = player.bet(stack, amount)
                         # When it's a full raise
@@ -333,7 +341,16 @@ class Hand:
 
         for player in self.player_list:
             player.stage_start()
-            player.bet(stack, self.ante)
+            stack_before = player.stack.amount
+
+            cost = player.bet(stack, self.ante)
+
+            if player.hand_status == 'all-in':
+                action_name = 'all-in'
+            else:
+                action_name = 'ante'
+
+            self.log(player, stack_before, action_name, cost, 'ante')
 
         self.add_to_pots(stack)
 
@@ -344,12 +361,31 @@ class Hand:
         for player in self.player_list:
             player.stage_start()
 
+        small_blind = self.player_list[sb]
+        big_blind = self.player_list[bb]
+        stack_before_sb = small_blind.stack.amount
+        stack_before_bb = big_blind.stack.amount
+
         # Collect blinds
-        self.player_list[sb].bet(stack, self.small_blind)
-        self.player_list[bb].bet(stack, self.big_blind)
+        cost_sb = small_blind.bet(stack, self.small_blind)
+        cost_bb = big_blind.bet(stack, self.big_blind)
+
         # Blinds still get a chance to act voluntarily
         self.player_list[sb].set_raise()
         self.player_list[bb].set_raise()
+
+        if small_blind.hand_status == 'all-in':
+            action_name_sb = 'all-in'
+        else:
+            action_name_sb = 'small-blind'
+
+        if big_blind.hand_status == 'all-in':
+            action_name_bb = 'all-in'
+        else:
+            action_name_bb = 'big-blind'
+
+        self.log(small_blind, stack_before_sb, action_name_sb, cost_sb, 'pre-flop')
+        self.log(big_blind, stack_before_bb, action_name_bb, cost_bb, 'pre-flop')
 
         # Deal cards, starting with small blind
         self.deal_hole_cards(index=sb)

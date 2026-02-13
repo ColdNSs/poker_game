@@ -53,7 +53,7 @@ class Player:
 
     def is_actable(self, max_bet):
         assert self.unresolved_chips <= max_bet
-        if self.hand_status == 'folded' or self.hand_status == 'all_in':
+        if self.hand_status == 'folded' or self.hand_status == 'all-in':
             return False
 
         if self.unresolved_chips != max_bet:
