@@ -16,6 +16,7 @@ class Player:
         self.can_raise = True
         self.hole_cards = []
         self.score = 0
+        self.rank = None
 
     def __repr__(self):
         return f"{self.name} ({self.agent.name})"
@@ -73,6 +74,11 @@ class Player:
         if score < 1:
             raise ValueError("Score evaluated by treys should be at least 1")
         self.score = score
+
+    def update_rank(self, rank: int):
+        if rank < 1:
+            raise ValueError("Assigned rank should be at least 1")
+        self.rank = rank
 
     def bet(self, stack: ChipStack, amount: int):
         if amount < 0:

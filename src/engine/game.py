@@ -100,7 +100,9 @@ class PokerGame:
             self.hand_count += 1
 
             # Rotate the dealer button
-            while not self.player_list[self.dealer_button] == 'alive':
+            found_next_alive_player = False
+            while not found_next_alive_player:
                 self.dealer_button = (self.dealer_button + 1) % n_players
+                found_next_alive_player = self.player_list[self.dealer_button].game_status == 'alive'
 
         print(f"Game ended. Winner: {winner}")

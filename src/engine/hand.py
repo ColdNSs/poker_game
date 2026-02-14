@@ -20,7 +20,8 @@ def get_player_result(player: Player, reveal: bool = False):
         'score': player.score if reveal else None,
         'total_bet_this_hand': player.total_bet_this_hand,
         'winnings': player.total_gain_this_hand,
-        'stack': player.stack.amount
+        'stack': player.stack.amount,
+        'rank': player.rank
     }
     return result
 
@@ -81,7 +82,6 @@ class Hand:
             hole_cards = self.deck.draw(2)
             self.player_list[index].receive_hole_cards(hole_cards)
             to_str = Card.ints_to_pretty_str(hole_cards)
-            print(f"Dealt hole cards to {self.player_list[index]}: {to_str}")
             index += 1
             if index == len(self.player_list):
                 index = 0
@@ -92,7 +92,6 @@ class Hand:
             raise ValueError("Cannot deal negative amount of community cards")
         self.community_cards = self.community_cards + self.deck.draw(amount)
         to_str = Card.ints_to_pretty_str(self.community_cards)
-        print(f"All community cards: {to_str}")
 
     def log(self, player: Player, stack_before: int, action: str, cost: int, stage: str):
         if action not in ['ante', 'small-blind', 'big-blind', 'bet', 'check', 'fold', 'call', 'raise', 'all-in']:
@@ -120,7 +119,8 @@ class Hand:
             'stack': player.stack.amount,
             'hand_status': player.hand_status,
             'current_bet_this_stage': player.unresolved_chips,
-            'total_bet_this_hand': player.total_bet_this_hand
+            'total_bet_this_hand': player.total_bet_this_hand,
+            'can_raise': player.can_raise
         }
         return player_status
 
@@ -228,12 +228,32 @@ class Hand:
         return isolated_history
 
     def hand_ended(self):
+        eliminated = [p for p in self.player_list if p.stack.amount == 0]
+        eliminated.sort(key=lambda p: p.total_bet_this_hand, reverse=True)
+        alive = [p for p in self.player_list if p.stack.amount != 0]
+        previous_player = None
+        alive_count = len(alive)
+        assert alive_count >= 1
+
+        for i in range(len(eliminated)):
+            player = eliminated[i]
+            player.update_rank(alive_count + 1 + i)
+            if previous_player:
+                assert player.total_bet_this_hand <= previous_player.total_bet_this_hand
+                if player.total_bet_this_hand == previous_player.total_bet_this_hand:
+                    player.update_rank(previous_player.rank)
+            previous_player = player
+
+        if alive_count == 1:
+            alive[0].update_rank(1)
+
         competing_players = self.get_competing_players()
         revealing_players = competing_players if len(competing_players) > 1 else []
         player_results = self.get_player_results(revealing_players)
         for player in self.player_list:
             hand_history = self.get_hand_history(player, competing_players, player_results)
             player.agent.hand_ended(hand_history)
+
         # If player stack is 0 after a hand, set their game status to 'eliminated'
         for player in self.player_list:
             player.check_alive()
@@ -387,8 +407,6 @@ class Hand:
                     continue
                 assert winner in pot['eligible_players']
                 winner.gain(pot['stack'], pot['stack'].amount)
-            # Log the win
-            print(f"Hand ended. {winner} wins by everyone else folding")
 
             return True
 
@@ -595,5 +613,3 @@ if __name__ == '__main__':
     example_hand = Hand(example_list, 0, 3, 1, 2, example_deck)
 
     example_hand.run_hand()
-    for example_player in example_list:
-        print(example_player, example_player.stack)

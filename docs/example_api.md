@@ -44,12 +44,16 @@ Game Start:
 start_state = {
     "initial_stack_per_player": 1000,
     "player_count": 8,
+    "your_status": {
+        "player_id": 2,
+        "stack": 1000,
+        "order": 0, # Game plays clockwise 0 -> 1 -> 2 -> 3 -> ... -> 0
+    },
     "players": [
         {
             "player_id": 2,
             "stack": 1000,
             "order": 0, # Game plays clockwise 0 -> 1 -> 2 -> 3 -> ... -> 0
-            "game_status": "alive" # alive / eliminated
         },
         # ... other players
     ],
@@ -84,7 +88,8 @@ game_state = {
         "stack": 900,
         "hand_status": "active",  # "active", "folded", "all-in"
         "current_bet_this_stage": 20,  # How much they put in this betting round
-        "total_bet_this_hand": 50
+        "total_bet_this_hand": 50,
+        "can_raise": True
     },
     
     # --- BETTING MATH ---
@@ -105,7 +110,8 @@ game_state = {
             "stack": 900,
             "hand_status": "active",      # "active", "folded", "all-in"
             "current_bet_this_stage": 20, # How much they put in this betting round
-            "total_bet_this_hand": 50
+            "total_bet_this_hand": 50,
+            "can_raise": True
         },
         # ... other players
     ],
@@ -136,6 +142,7 @@ hand_history = {
         "total_bet_this_hand": 1200, # Chips spent
         "winnings": 3600, # Chips gained
         "stack": 2200, # Stack after this hand
+        "rank": None # When player is still alive
     },
     "player_results": [
         {
@@ -146,6 +153,7 @@ hand_history = {
             "total_bet_this_hand": 1200, # Chips spent
             "winnings": 3600, # Chips gained
             "stack": 2200, # Stack after this hand
+            "rank": None # When player is still alive
         },
         {
             "player_id": 1,
@@ -154,7 +162,8 @@ hand_history = {
             "score": 123123123,
             "total_bet_this_hand": 1200, # Chips spent
             "winnings": 0, # Chips gained
-            "stack": 0 # Player is eliminated when stack is reduced to 0
+            "stack": 0, # Player is eliminated when stack is reduced to 0
+            "rank": 3 # When player is eliminated
         },
         {
             "player_id": 2,
@@ -163,7 +172,8 @@ hand_history = {
             "score": None,
             "total_committed": 1200, # Chips spent
             "winnings": 0, # Chips gained
-            "stack": 500
+            "stack": 500,
+            "rank": None
         }, 
     ],
     "full_action_log": [...] # Complete list of every bet/check this hand

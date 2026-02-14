@@ -163,7 +163,6 @@ class InputAgent(BasePokerAgent):
                     f"You commit {pretty_loss} this hand and don’t get them back.",
                     f"You invest {pretty_loss}, but this one doesn’t go your way.",
                     f"You put {pretty_loss} into the middle and they stay there.",
-                    f"You take a shot and it costs you {pretty_loss}.",
                     f"You step away from the pot, down {pretty_loss} this hand.",
                     f"You test the waters and retreat, {pretty_loss} lighter.",
                 ]
@@ -197,9 +196,28 @@ class InputAgent(BasePokerAgent):
     def pretty_player_names(self, player_ids: list[int]):
         pretty_str = ""
         for player_id in player_ids:
-            pretty_str = pretty_str + f"#{self.pretty_player_name(player_id)}, "
+            pretty_str = pretty_str + f"{self.pretty_player_name(player_id)}, "
         pretty_str = pretty_str.rstrip(", ")
         return pretty_str
+
+    def pretty_start_players(self, your_id: int, players, boundary_char: str = "*"):
+        pretty_status = []
+        for player in players:
+            player_id = player['player_id']
+            order = player['order']
+            stack = player['stack']
+
+            pretty_name = self.pretty_player_name(player_id)
+            pretty_order = f"Order: {order}"
+            pretty_stack = f"Stack {self.chip2dollar(stack)}"
+
+            pretty_list = [pretty_name, pretty_order, pretty_stack, ""]
+            highlighted = True if your_id == player_id else False
+            padded_list = box_padding(pretty_list, highlighted, boundary_char)
+            pretty_status.append(padded_list)
+
+        spliced_status = splice(pretty_status, boundary_char)
+        return spliced_status
 
     def pretty_players(self, your_id: int, players, logs, boundary_char: str = "*"):
         dealer, sb ,bb, _ = get_positions(len(players))
@@ -295,6 +313,27 @@ class InputAgent(BasePokerAgent):
             spliced_results[2] = spliced_results[2].replace(f"[{card}]", pretty_card(card))
         return spliced_results
 
+    def pretty_print_game_start(self, start_state):
+        pretty_print = ["------ GAME START ------"]
+
+        your_id = start_state['your_status']['player_id']
+        pretty_print.append(f"[ Game Start ] You are playing as {self.pretty_player_name(your_id)}")
+
+        players = start_state['players']
+        pretty_players = self.pretty_start_players(your_id, players)
+        pretty_print = pretty_print + pretty_players
+
+        player_count = start_state['player_count']
+        init_stack = start_state['initial_stack_per_player']
+        pretty_print.append(f"{player_count} players in total. Each with {self.chip2dollar(init_stack)} initial stack.")
+
+        pretty_print.append(f"These are your enemies. Defeat them and win a million.")
+
+        for item in pretty_print:
+            print(item)
+
+        prompt_confirm()
+
     def pretty_print_game_state(self, game_state: dict):
         pretty_print = ["------ GAME STATE ------"]
 
@@ -348,12 +387,19 @@ class InputAgent(BasePokerAgent):
         pretty_print.append(pretty_hole)
 
         bet_to_call = game_state['bet_to_match']
+        cost_to_match = game_state['cost_to_match']
+        min_cost_to_increase = game_state['min_cost_to_increase']
+        can_raise = game_state['your_status']['can_raise']
         if bet_to_call == 0:
             pretty_cost = f"Check to stay in the hand. "\
-                          f"Or bet at least {self.chip2dollar(game_state['min_cost_to_increase'])}."
+                          f"Or bet at least {self.chip2dollar(min_cost_to_increase)}."
         else:
-            pretty_cost = f"Spend {self.chip2dollar(game_state['cost_to_match'])} to call. "\
-                          f"Or spend at least {self.chip2dollar(game_state['min_cost_to_increase'])} to raise."
+            if cost_to_match == 0:
+                pretty_cost = f"Check to stay in the hand."
+            else:
+                pretty_cost = f"Spend {self.chip2dollar(cost_to_match)} to call."
+            if can_raise:
+                pretty_cost = pretty_cost + f" Or spend at least {self.chip2dollar(min_cost_to_increase)} to raise."
         pretty_print.append(pretty_cost)
 
         for item in pretty_print:
@@ -393,7 +439,16 @@ class InputAgent(BasePokerAgent):
         stack = hand_history['your_result']['stack']
         hand_status = hand_history['your_result']['hand_status']
         commentary = self.pick_commentary(total_bet_this_hand, winnings, stack, hand_status, end_at)
-        pretty_print.append(commentary)
+        pretty_print.append(f'"{commentary}"')
+
+        rank = hand_history['your_result']['rank']
+        if rank:
+            if rank == 1:
+                pretty_print.append(f"You win the game!")
+            else:
+                pretty_print.append(f"You are eliminated. Your rank is No.{rank}")
+        else:
+            pretty_print.append(f"Your game continues on.")
 
         for item in pretty_print:
             print(item)
@@ -401,7 +456,7 @@ class InputAgent(BasePokerAgent):
         prompt_confirm()
 
     def game_start(self, start_state):
-        print(start_state)
+        self.pretty_print_game_start(start_state)
 
     def decide_action(self, game_state: dict):
         self.pretty_print_game_state(game_state)
