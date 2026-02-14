@@ -4,6 +4,25 @@ from treys import Card, Deck, Evaluator
 from agents.input_agent import InputAgent
 from copy import deepcopy
 
+def card_list2str(card_list: list[int]):
+    str_list = []
+    for card in card_list:
+        str_list.append(Card.int_to_str(card))
+    return str_list
+
+def get_player_result(player: Player, reveal: bool = False):
+    if reveal:
+        assert player.score > 0
+    result = {
+        'player_id': player.player_id,
+        'hand_status': player.hand_status,
+        'hole_cards': card_list2str(player.hole_cards) if reveal else None,
+        'score': player.score if reveal else None,
+        'total_bet_this_hand': player.total_bet_this_hand,
+        'winnings': player.total_gain_this_hand,
+        'stack': player.stack.amount
+    }
+    return result
 
 class InvalidStringError(Exception):
     """Raised when an invalid or illegal string is found."""
@@ -15,7 +34,6 @@ class Hand:
             self,
             player_list: list[Player],
             hand_id: int,
-            round_id: int,
             ante: int,
             small_blind: int,
             big_blind: int,
@@ -25,7 +43,6 @@ class Hand:
         assert len(player_list) == len(set(player_list)) # No duplicated players
         self.player_list = player_list
         self.hand_id = hand_id
-        self.round_id = round_id
         self.ante = ante
         self.small_blind = small_blind
         self.big_blind = big_blind
@@ -110,13 +127,9 @@ class Hand:
     def get_game_state(self, player: Player, stack: ChipStack, bet_to_call: int, min_raise: int):
         current_stage = self.get_stage_name()
 
-        hole_cards = []
-        for hole_card in player.hole_cards:
-            hole_cards.append(Card.int_to_str(hole_card))
+        hole_cards = card_list2str(player.hole_cards)
 
-        community_cards = []
-        for community_card in self.community_cards:
-            community_cards.append(Card.int_to_str(community_card))
+        community_cards = card_list2str(self.community_cards)
 
         pots = []
         competing_players = self.get_competing_players()
@@ -149,7 +162,6 @@ class Hand:
 
             # --- PUBLIC SHARED INFO ---
             "hand_id": self.hand_id,
-            "round_id": self.round_id,
             "community_cards": community_cards,
             "current_stage": current_stage,  # "pre-flop", "flop", "turn", "river"
             "stage_pot": stack.amount,
@@ -179,6 +191,52 @@ class Hand:
         isolated_state = deepcopy(game_state)
 
         return isolated_state
+
+    def get_player_results(self, revealing_players: list[Player]):
+        player_results = []
+        for player in self.player_list:
+            reveal = True if player in revealing_players else False
+            result = get_player_result(player, reveal)
+            player_results.append(result)
+        return player_results
+
+    def get_hand_history(self, player: Player, competing_players, player_results):
+        community_cards = card_list2str(self.community_cards)
+
+        reveal = False
+        if len(competing_players) > 1:
+            end_at = 'showdown'
+            if player in competing_players:
+                reveal = True
+        else:
+            end_at = self.get_stage_name()
+
+        hand_history = {
+            'hand_id': self.hand_id,
+            'ante': self.ante,
+            'small_blind': self.small_blind,
+            'big_blind': self.big_blind,
+            'community_cards': community_cards,
+            'end_at': end_at,
+            'your_result': get_player_result(player, reveal),
+            'player_results': player_results,
+            'full_action_log': self.hand_log
+        }
+
+        isolated_history = deepcopy(hand_history)
+
+        return isolated_history
+
+    def hand_ended(self):
+        competing_players = self.get_competing_players()
+        revealing_players = competing_players if len(competing_players) > 1 else []
+        player_results = self.get_player_results(revealing_players)
+        for player in self.player_list:
+            hand_history = self.get_hand_history(player, competing_players, player_results)
+            player.agent.hand_ended(hand_history)
+        # If player stack is 0 after a hand, set their game status to 'eliminated'
+        for player in self.player_list:
+            player.check_alive()
 
     # Extremely messy codes here. Should exist a better implementation
     def add_to_pots(self, stack: ChipStack):
@@ -218,7 +276,6 @@ class Hand:
             player.resolve(player.unresolved_chips)
 
         assert stack.amount == 0
-        print(self.pot_stacks)
 
     def get_max_bet(self):
         return max(p.unresolved_chips for p in self.player_list)
@@ -234,7 +291,7 @@ class Hand:
             if actable:
 
                 game_state = self.get_game_state(player, stack, bet_to_call, min_raise)
-                action = self.player_list[current_player].decide_action(game_state)
+                action = self.player_list[current_player].agent.decide_action(game_state)
                 stack_before = player.stack.amount
                 bet_to_call_before = bet_to_call
                 cost = 0
@@ -329,7 +386,7 @@ class Hand:
                 if pot['stack'].amount == 0:
                     continue
                 assert winner in pot['eligible_players']
-                winner.stack.add(pot['stack'].pop(pot['stack'].amount))
+                winner.gain(pot['stack'], pot['stack'].amount)
             # Log the win
             print(f"Hand ended. {winner} wins by everyone else folding")
 
@@ -467,6 +524,7 @@ class Hand:
             for player in eligible_players:
                 assert len(player.hole_cards) == 2
                 score = self.evaluator.evaluate(player.hole_cards, self.community_cards)
+                player.update_score(score)
                 player_scores.append((player, score))
             player_scores.sort(key=lambda x: x[1])
             best_score = player_scores[0][1]
@@ -477,16 +535,14 @@ class Hand:
             odd_chips = pot_amount % num_winners
 
             for winner in winners:
-                winner.stack.add(pot['stack'].pop(split_amount))
-                print(f"{winner.name} wins {split_amount} from the pot")
+                winner.gain(pot['stack'], split_amount)
 
             if odd_chips > 0:
-                print(f"Distributing {odd_chips} odd chips...")
                 _, index, _, _ = self.get_positions()
                 while odd_chips:
                     player = self.player_list[index]
                     if player in winners:
-                        player.stack.add(pot['stack'].pop(1))
+                        player.gain(pot['stack'], 1)
                         odd_chips -= 1
                     index += 1
                     if index == len(self.player_list):
@@ -509,17 +565,25 @@ class Hand:
 
             # Did everyone fold?
             if self.check_uncontested_win():
+                self.hand_ended()
                 return  # Exit run_hand immediately
 
         # If we survive all stages without a fold-win, it's a showdown
         self.showdown()
+        self.hand_ended()
 
 
 if __name__ == '__main__':
-    alice = Player(0, InputAgent(), "Alice")
-    bob = Player(1, InputAgent(), "Bob")
-    clementine = Player(2, InputAgent(), "Clementine")
-    dave = Player(3, InputAgent(), "Dave")
+    player_names = {
+        0: "Alice",
+        1: "Bob",
+        2: "Clementine",
+        3: "Dave"
+    }
+    alice = Player(0, InputAgent(player_names=player_names), "Alice")
+    bob = Player(1, InputAgent(player_names=player_names), "Bob")
+    clementine = Player(2, InputAgent(player_names=player_names), "Clementine")
+    dave = Player(3, InputAgent(player_names=player_names), "Dave")
 
     alice.stack.add(20)
     bob.stack.add(9)
@@ -528,9 +592,8 @@ if __name__ == '__main__':
 
     example_list = [alice, bob, clementine, dave]
     example_deck = Deck()
-    example_hand = Hand(example_list, 0, 0, 3, 1, 2, example_deck)
+    example_hand = Hand(example_list, 0, 3, 1, 2, example_deck)
 
     example_hand.run_hand()
     for example_player in example_list:
         print(example_player, example_player.stack)
-    print(example_hand.hand_log)

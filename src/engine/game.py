@@ -6,6 +6,7 @@ from chip_stack import ChipStack
 from copy import deepcopy
 from hand import Hand
 
+
 class PokerGame:
     def __init__(self, game_id: int, players: set[Player], initial_chips_per_player: int = 200 ,game_seed: int = None):
         if not (2 <= len(players) <= 10):
@@ -15,7 +16,6 @@ class PokerGame:
         self.players = players
         self.game_seed = generate_game_seed(game_seed)
         self.hand_count = 0     # +1 after each hand
-        self.round_count = 0    # +1 after each time dealer button returns to its initial position
         self.dealer_button = 0
         self.ante = 0
         self.small_blind = 1
@@ -49,41 +49,48 @@ class PokerGame:
         self.game_start(initial_chips_per_player)
         # self.run_game()
 
+    def get_player_status(self, player: Player):
+        player_status = {
+            "player_id": player.player_id,
+            "stack": player.stack.amount,
+            "order": self.player_list.index(player)
+        }
+        return player_status
+
     def game_start(self, initial_chips_per_player: int):
-        player_states = []
-        for order, player in enumerate(self.player_list):
-            player_state = {
-                "player_id": player.player_id,
-                "stack": player.stack.amount,
-                "order": order,
-                "game_status": player.game_status
-            }
-            player_states.append(player_state)
+        players = []
+        for player in self.player_list:
+            player_status = self.get_player_status(player)
+            players.append(player_status)
 
         start_state = {
             "initial_stack_per_player": initial_chips_per_player,
             "player_count": len(self.players),
-            "your_id": None,
-            "players": player_states
+            "your_status": dict(),
+            "players": players
         }
 
         for player in self.player_list:
             isolated_state = deepcopy(start_state)
-            isolated_state['your_id'] = player.player_id
-            player.game_start(isolated_state)
+            isolated_state['your_status'] = self.get_player_status(player)
+            player.agent.game_start(isolated_state)
 
     def run_game(self):
-        winner = None
-        while not winner:
-            # Rotate the player list so that dealer is at index 0 in the new list
+        n_players = len(self.players)
+        while True:
+            # Dealer is at index 0 in the hand player list
             hand_players = self.player_list[self.dealer_button:] + self.player_list[:self.dealer_button]
             # Exclude eliminated players
             hand_players = [player for player in hand_players if player.game_status == 'alive']
-            assert 2 <= len(hand_players) <= 10
+
+            self.alive_count = len(hand_players)
+            assert self.alive_count > 0
+            if self.alive_count == 1:
+                winner = hand_players[0]
+                break
 
             hand = Hand(hand_players,
-                        self.hand_count,
-                        self.round_count,
+                        self.hand_count + 1,
                         self.ante,
                         self.small_blind,
                         self.big_blind,
@@ -92,22 +99,8 @@ class PokerGame:
 
             self.hand_count += 1
 
-            for player in hand_players:
-                player.check_alive()
+            # Rotate the dealer button
+            while not self.player_list[self.dealer_button] == 'alive':
+                self.dealer_button = (self.dealer_button + 1) % n_players
 
-            alive_players = [player for player in hand_players if player.game_status == 'alive']
-            self.alive_count = len(alive_players)
-            assert self.alive_count > 0
-            if self.alive_count == 1:
-                winner = alive_players[0]
-
-            found_next_alive_player = False
-            while not found_next_alive_player:
-                self.dealer_button += 1
-                if self.dealer_button == len(self.player_list):
-                    self.dealer_button = 0
-                    self.round_count += 1
-
-                if self.player_list[self.dealer_button] == 'alive':
-                    found_next_alive_player = True
-
+        print(f"Game ended. Winner: {winner}")

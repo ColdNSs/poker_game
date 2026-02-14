@@ -12,21 +12,13 @@ class Player:
         self.hand_status = 'active' # active / folded / all-in
         self.unresolved_chips = 0 # Total committed chips this stage
         self.total_bet_this_hand = 0
+        self.total_gain_this_hand = 0
         self.can_raise = True
         self.hole_cards = []
+        self.score = 0
 
     def __repr__(self):
         return f"{self.name} ({self.agent.name})"
-
-    def game_start(self, start_state):
-        self.agent.game_start(start_state)
-
-    def decide_action(self, game_state):
-        action = self.agent.decide_action(game_state)
-        return action
-
-    def hand_ended(self, hand_history):
-        self.agent.hand_ended(hand_history)
 
     # This function should only be called at the end of a hand
     def check_alive(self):
@@ -35,6 +27,7 @@ class Player:
             return
         self.hand_status = 'active'
         self.total_bet_this_hand = 0
+        self.total_gain_this_hand = 0
 
     def stage_start(self):
         assert self.unresolved_chips == 0
@@ -50,6 +43,12 @@ class Player:
             raise ValueError(f"Cannot resolve more than current unresolved chips"
                              f"{amount} > {self.unresolved_chips}")
         self.unresolved_chips -= amount
+
+    def gain(self, stack: ChipStack, amount: int):
+        if amount < 0:
+            raise ValueError("Cannot gain negative chips")
+        self.stack.add(stack.pop(amount))
+        self.total_gain_this_hand += amount
 
     def is_actable(self, max_bet):
         assert self.unresolved_chips <= max_bet
@@ -69,6 +68,11 @@ class Player:
 
     def set_raise(self):
         self.can_raise = True
+
+    def update_score(self, score: int):
+        if score < 1:
+            raise ValueError("Score evaluated by treys should be at least 1")
+        self.score = score
 
     def bet(self, stack: ChipStack, amount: int):
         if amount < 0:

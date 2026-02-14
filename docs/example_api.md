@@ -64,7 +64,6 @@ game_state = {
 
     # --- PUBLIC SHARED INFO ---
     "hand_id": 0,
-    "round_id": 0,
     "community_cards": ['2h', '5d', '9s'], # Empty [] pre-flop
     "current_stage": "flop",   # "pre-flop", "flop", "turn", "river"
     "pots": [
@@ -123,30 +122,47 @@ game_state = {
 Hand history:
 ```python
 hand_history = {
+    "hand_id": 0,
+    "small_blind": 10,
+    "big_blind": 20,
+    "ante": 10,
     "community_cards": ['2h', '5d', '9s'],
-    "showdown_data": [
+    "end_at": "showdown",
+    "your_result": {
+        "player_id": 0,
+        "hand_status": "active",
+        "hole_cards": ['Ah', 'Kh'],
+        "score": 123123123, # Score evaluated by treys. Lower score means better hand
+        "total_bet_this_hand": 1200, # Chips spent
+        "winnings": 3600, # Chips gained
+        "stack": 2200, # Stack after this hand
+    },
+    "player_results": [
         {
             "player_id": 0,
+            "hand_status": "active",
             "hole_cards": ['Ah', 'Kh'],
-            "hand_rank": 123123123,
-            "winning_pots": [0, 1],
-            "gain": 1200, # Positive for chips gained this hand, negative for chips lost this game
+            "score": 123123123, # Score evaluated by treys. Lower score means better hand
+            "total_bet_this_hand": 1200, # Chips spent
+            "winnings": 3600, # Chips gained
             "stack": 2200, # Stack after this hand
         },
         {
             "player_id": 1,
+            "hand_status": "all-in",
             "hole_cards": ['2c', '7d'],
-            "hand_rank": 123123123,
-            "winning_pots": None,
-            "gain": -200,
+            "score": 123123123,
+            "total_bet_this_hand": 1200, # Chips spent
+            "winnings": 0, # Chips gained
             "stack": 0 # Player is eliminated when stack is reduced to 0
         },
         {
             "player_id": 2,
+            "hand_status": "active",
             "hole_cards": None, # Folded earlier, cards remain a mystery
-            "hand_rank": None,
-            "winning_pots": None,
-            "gain": -130,
+            "score": None,
+            "total_committed": 1200, # Chips spent
+            "winnings": 0, # Chips gained
             "stack": 500
         }, 
     ],
