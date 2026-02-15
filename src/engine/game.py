@@ -5,21 +5,24 @@ from random import Random
 from chip_stack import ChipStack
 from copy import deepcopy
 from hand import Hand
+from escalator import BaseEscalator
 
 
 class PokerGame:
-    def __init__(self, game_id: int, players: set[Player], initial_chips_per_player: int = 200 ,game_seed: int = None):
+    def __init__(self, game_id: int, players: set[Player], escalator: BaseEscalator, initial_chips_per_player: int = 200 ,game_seed: int = None):
         if not (2 <= len(players) <= 10):
             raise ValueError("Game requires between 2 and 10 players")
 
         self.game_id = game_id
         self.players = players
+        self.escalator = escalator
         self.game_seed = generate_game_seed(game_seed)
         self.hand_count = 0     # +1 after each hand
         self.dealer_button = 0
         self.ante = 0
         self.small_blind = 1
         self.big_blind = 2
+        self.big_blind_ante = 0
         self.alive_count = len(self.players)
 
         # Derive seeds from the game seed
@@ -75,6 +78,9 @@ class PokerGame:
             isolated_state['your_status'] = self.get_player_status(player)
             player.agent.game_start(isolated_state)
 
+    def escalate(self):
+        self.small_blind, self.big_blind, self.ante, self.big_blind_ante = self.escalator.get_blind_parameters(self.hand_count, self.alive_count)
+
     def run_game(self):
         n_players = len(self.players)
         while True:
@@ -89,11 +95,14 @@ class PokerGame:
                 winner = hand_players[0]
                 break
 
+            self.escalate()
+
             hand = Hand(hand_players,
                         self.hand_count + 1,
                         self.ante,
                         self.small_blind,
                         self.big_blind,
+                        self.big_blind_ante,
                         self.deck)
             hand.run_hand()
 
@@ -105,4 +114,4 @@ class PokerGame:
                 self.dealer_button = (self.dealer_button + 1) % n_players
                 found_next_alive_player = self.player_list[self.dealer_button].game_status == 'alive'
 
-        print(f"Game ended. Winner: {winner}")
+        print(f"Game ended at Hand {self.hand_count}. Winner: {winner}")

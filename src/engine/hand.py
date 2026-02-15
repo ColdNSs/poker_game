@@ -38,6 +38,7 @@ class Hand:
             ante: int,
             small_blind: int,
             big_blind: int,
+            big_blind_ante: int,
             deck: Deck
     ):
         assert 2 <= len(player_list) <= 10
@@ -47,7 +48,9 @@ class Hand:
         self.ante = ante
         self.small_blind = small_blind
         self.big_blind = big_blind
+        self.big_blind_ante = big_blind_ante
         self.deck = deck
+        self.current_stage = None
         self.community_cards = []
         self.pot_stacks = []
         self.evaluator = Evaluator()
@@ -81,7 +84,6 @@ class Hand:
         for _ in range(len(self.player_list)):
             hole_cards = self.deck.draw(2)
             self.player_list[index].receive_hole_cards(hole_cards)
-            to_str = Card.ints_to_pretty_str(hole_cards)
             index += 1
             if index == len(self.player_list):
                 index = 0
@@ -91,7 +93,6 @@ class Hand:
         if amount < 0:
             raise ValueError("Cannot deal negative amount of community cards")
         self.community_cards = self.community_cards + self.deck.draw(amount)
-        to_str = Card.ints_to_pretty_str(self.community_cards)
 
     def log(self, player: Player, stack_before: int, action: str, cost: int, stage: str):
         if action not in ['ante', 'small-blind', 'big-blind', 'bet', 'check', 'fold', 'call', 'raise', 'all-in']:
@@ -107,11 +108,6 @@ class Hand:
         }
         self.hand_log.append(log_item)
 
-    def get_stage_name(self):
-        stages = {0: 'pre-flop', 3: 'flop', 4: 'turn', 5: 'river'}
-        current_stage = stages[len(self.community_cards)]
-        return current_stage
-
     def get_player_status(self, player: Player):
         player_status = {
             'position': self.player_list.index(player),
@@ -125,7 +121,7 @@ class Hand:
         return player_status
 
     def get_game_state(self, player: Player, stack: ChipStack, bet_to_call: int, min_raise: int):
-        current_stage = self.get_stage_name()
+        current_stage = self.current_stage
 
         hole_cards = card_list2str(player.hole_cards)
 
@@ -175,9 +171,9 @@ class Hand:
             "min_increase": min_raise,                 # Minimum amount to increase by if you want to bet or raise
             "cost_to_match": bet_to_call - player.unresolved_chips,  # How much you have to pay if you want to check or call
             "min_cost_to_increase": bet_to_call - player.unresolved_chips + min_raise, # How much at least you have to pay if you want to bet or raise
-            "small_blind": self.small_blind,        # Reference for sizing bets
-            "big_blind": self.big_blind,            # Reference for sizing bets
-            "ante": self.ante,                      # Reference for sizing bets
+            "small_blind": self.small_blind,                # Reference for sizing bets
+            "big_blind": self.big_blind,                    # Reference for sizing bets
+            "ante": max(self.ante, self.big_blind_ante),    # Reference for sizing bets
 
             # --- PLAYER STATUS ---
             # A list of everyone at the table (ordered by position)
@@ -203,17 +199,12 @@ class Hand:
     def get_hand_history(self, player: Player, competing_players, player_results):
         community_cards = card_list2str(self.community_cards)
 
-        reveal = False
-        if len(competing_players) > 1:
-            end_at = 'showdown'
-            if player in competing_players:
-                reveal = True
-        else:
-            end_at = self.get_stage_name()
+        end_at = self.current_stage
+        reveal = True if end_at == 'showdown' and player in competing_players else False
 
         hand_history = {
             'hand_id': self.hand_id,
-            'ante': self.ante,
+            'ante': max(self.ante, self.big_blind_ante),
             'small_blind': self.small_blind,
             'big_blind': self.big_blind,
             'community_cards': community_cards,
@@ -248,7 +239,7 @@ class Hand:
             alive[0].update_rank(1)
 
         competing_players = self.get_competing_players()
-        revealing_players = competing_players if len(competing_players) > 1 else []
+        revealing_players = competing_players if self.current_stage == 'showdown' else []
         player_results = self.get_player_results(revealing_players)
         for player in self.player_list:
             hand_history = self.get_hand_history(player, competing_players, player_results)
@@ -301,8 +292,10 @@ class Hand:
         return max(p.unresolved_chips for p in self.player_list)
 
     def betting_stage(self, stack: ChipStack, current_player: int, bet_to_call: int, min_raise: int):
-        if len(self.get_active_players()) < 2:
-            return
+        active_players = self.get_active_players()
+        if len(active_players) < 2:
+            if active_players[0].unresolved_chips == bet_to_call:
+                return
         retry_count = 0     # Times failed to find the next active player
         while retry_count < len(self.player_list) - 1:
             # Pick the next player in order
@@ -315,7 +308,6 @@ class Hand:
                 stack_before = player.stack.amount
                 bet_to_call_before = bet_to_call
                 cost = 0
-                action_name = 'none'
 
                 if action['action'] == 'fold':
                     player.fold()
@@ -370,7 +362,7 @@ class Hand:
                     raise InvalidStringError(f"Undefined action '{action['action']}'")
 
                 # Log the action
-                self.log(player, stack_before, action_name, cost, self.get_stage_name())
+                self.log(player, stack_before, action_name, cost, self.current_stage)
 
             # If player acted and did not fold, next retry starts with retry count set to 0
             if actable and not player.hand_status == 'folded':
@@ -413,24 +405,43 @@ class Hand:
         return False
 
     def collect_antes(self):
+        self.current_stage = 'ante'
         stack = ChipStack()
 
-        for player in self.player_list:
-            player.stage_start()
-            stack_before = player.stack.amount
+        if self.ante:
+            for player in self.player_list:
+                player.stage_start()
+                stack_before = player.stack.amount
 
-            cost = player.bet(stack, self.ante)
+                cost = player.bet(stack, self.ante)
 
-            if player.hand_status == 'all-in':
-                action_name = 'all-in'
-            else:
-                action_name = 'ante'
+                if player.hand_status == 'all-in':
+                    action_name = 'all-in'
+                else:
+                    action_name = 'ante'
 
-            self.log(player, stack_before, action_name, cost, 'ante')
+                self.log(player, stack_before, action_name, cost, 'ante')
+
+        if self.big_blind_ante:
+            _, _, bb, _ = self.get_positions()
+            big_blind = self.player_list[bb]
+            stack_before = big_blind.stack.amount
+
+            if stack_before:
+
+                cost = big_blind.bet(stack, self.big_blind_ante)
+
+                if big_blind.hand_status == 'all-in':
+                    action_name = 'all-in'
+                else:
+                    action_name = 'big-blind-ante'
+
+                self.log(big_blind, stack_before, action_name, cost, 'ante')
 
         self.add_to_pots(stack)
 
     def run_preflop(self):
+        self.current_stage = 'pre-flop'
         stack = ChipStack()
         _, sb, bb, utg = self.get_positions()
 
@@ -475,6 +486,7 @@ class Hand:
         self.add_to_pots(stack)
 
     def run_flop(self):
+        self.current_stage = 'flop'
         stack = ChipStack()
         _, sb, _, _ = self.get_positions()
 
@@ -493,6 +505,7 @@ class Hand:
         self.add_to_pots(stack)
 
     def run_turn(self):
+        self.current_stage = 'turn'
         stack = ChipStack()
         _, sb, _, _ = self.get_positions()
 
@@ -511,6 +524,7 @@ class Hand:
         self.add_to_pots(stack)
 
     def run_river(self):
+        self.current_stage = 'river'
         stack = ChipStack()
         _, sb, _, _ = self.get_positions()
 
@@ -529,7 +543,10 @@ class Hand:
         self.add_to_pots(stack)
 
     def showdown(self):
-        assert len(self.community_cards) == 5
+        if len(self.community_cards) != 5:
+            raise ValueError("5 community cards are needed for showdown")
+        self.current_stage = 'showdown'
+
         competing_players = self.get_competing_players()
         assert len(competing_players) > 1
 
@@ -540,7 +557,8 @@ class Hand:
             eligible_players = list(set(competing_players) & set(pot['eligible_players']))
             player_scores = []
             for player in eligible_players:
-                assert len(player.hole_cards) == 2
+                if len(player.hole_cards) != 2:
+                    raise ValueError("Each player should have 2 hole cards at showdown")
                 score = self.evaluator.evaluate(player.hole_cards, self.community_cards)
                 player.update_score(score)
                 player_scores.append((player, score))
@@ -610,6 +628,6 @@ if __name__ == '__main__':
 
     example_list = [alice, bob, clementine, dave]
     example_deck = Deck()
-    example_hand = Hand(example_list, 0, 3, 1, 2, example_deck)
+    example_hand = Hand(example_list, 0, 3, 1, 2, 0, example_deck)
 
     example_hand.run_hand()
