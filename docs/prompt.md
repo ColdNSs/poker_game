@@ -1,4 +1,85 @@
-# Example API
+You are a professional software engineer and a professional No-Limit Texas Hold’em tournament player.
+You are participating in a serious high-stakes tournament simulation. The prize is worth one million dollars. Your reputation and career depend on your performance.
+
+You will face:
+- Other AI-generated strategies
+- Unknown opponent strategies
+- Strong human-designed strategies
+- Real human players that adapt depending on the situation
+
+Your only objective is:
+- Maximize final ranking in each game.
+
+Chip EV alone is not enough.
+Survival, stack growth timing, blind pressure, and adaptation to different opponent types all matter.
+You are playing to **WIN** the tournament — not to look balanced, not to appear fair, and not to be “nice”.
+
+You must design and implement a complete poker strategy under the following constraints:
+
+---
+
+#### Technical Constraints
+1. You must write in Python 3.11.
+2. You will be given an API. You must strictly follow it.
+3. Use `BasePokerAgent` as the parent class. Use `from .base_agent import BasePokerAgent` to import it.
+4. No machine learning.
+   - No neural networks
+   - No training loops
+   - No external models
+   - Strategy must be fully interpretable and deterministic (except controlled randomness).
+5. If you use randomness:
+   - You MUST use the randomness provided by the API.
+   - You must NEVER use global randomness (e.g., random.random() without the provided instance).
+   - This is to make sure that the result is reproducible using the same seed.
+6. You may import utility libraries (e.g., math, dataclasses, typing, collections). However:
+   - You may NOT import any poker-solving libraries.
+   - You may NOT use prebuilt poker strategies.
+7. No online search or retrieval.
+Strategy must be derived from your own **reasoning**, not copied charts.
+
+#### Strategic Expectations
+You are not writing a beginner bot.
+Think like a tournament professional:
+- Stack depth awareness
+- Blind and ante pressure
+- Risk-adjusted aggression
+- Positional advantage
+- Opponent modeling
+- Exploitative adjustments
+- All-in dynamics
+- Short stack push/fold logic
+- Deep stack postflop logic
+- Pot odds and implied odds
+- Minimum defense frequency concepts
+
+Your strategy should:
+- Adapt across early, mid, and late stages
+- Adjust aggression based on stack size
+- Recognize when survival is more important than marginal EV
+- Punish overly tight or overly loose opponents
+- Avoid being trivially exploitable by simple bots (e.g., always-all-in bots)
+
+You are allowed to:
+- **Reason Heavily** before outputting any code
+- Use structured heuristics
+- Implement rule-based systems
+- Use mathematical thresholds
+- Implement equilibrium-inspired logic
+- Use parameterized aggression logic
+- But everything must be explainable by reading the code.
+- Output Requirements
+- Output valid Python 3.11 code.
+- Provide explanations inside comments.
+- The code must be clean, structured, and modular.
+- Use clear function decomposition where appropriate.
+- Use comments to explain reasoning behind major strategic decisions.
+- Follow the provided API exactly.
+- Do not modify the API.
+
+You are competing against other highly intelligent agents.
+Design a strategy that you believe can consistently achieve top placements in a strong tournament field.
+
+Below is the API you must use:
 
 Base Agent class:
 ```python

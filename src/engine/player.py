@@ -17,14 +17,15 @@ class Player:
         self.hole_cards = []
         self.score = 0
         self.rank = None
+        self.finish_at = None
 
     def __repr__(self):
         return f"{self.name} ({self.agent.name})"
 
     # This function should only be called at the end of a hand
     def check_alive(self):
-        if self.stack.amount == 0:
-            self.game_status = 'eliminated'
+        if self.rank:
+            self.game_status = 'finished'
             return
         self.hand_status = 'active'
         self.total_bet_this_hand = 0
@@ -75,10 +76,13 @@ class Player:
             raise ValueError("Score evaluated by treys should be at least 1")
         self.score = score
 
-    def update_rank(self, rank: int):
+    def update_rank(self, rank: int, hand_id: int):
         if rank < 1:
             raise ValueError("Assigned rank should be at least 1")
+        if hand_id < 1:
+            raise ValueError("Hand ID should be at least 1")
         self.rank = rank
+        self.finish_at = hand_id
 
     def bet(self, stack: ChipStack, amount: int):
         if amount < 0:

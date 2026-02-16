@@ -66,9 +66,12 @@ class PokerGame:
             player_status = self.get_player_status(player)
             players.append(player_status)
 
+        _, big_blind, _, _ = self.escalator.get_blind_parameters(self.hand_count, self.alive_count)
+
         start_state = {
             "initial_stack_per_player": initial_chips_per_player,
             "player_count": len(self.players),
+            "level_one_big_blind": big_blind,
             "your_status": dict(),
             "players": players
         }
@@ -89,12 +92,6 @@ class PokerGame:
             # Exclude eliminated players
             hand_players = [player for player in hand_players if player.game_status == 'alive']
 
-            self.alive_count = len(hand_players)
-            assert self.alive_count > 0
-            if self.alive_count == 1:
-                winner = hand_players[0]
-                break
-
             self.escalate()
 
             hand = Hand(hand_players,
@@ -108,10 +105,21 @@ class PokerGame:
 
             self.hand_count += 1
 
+            alive_players = [player for player in hand_players if player.game_status == 'alive']
+
+            self.alive_count = len(alive_players)
+            if self.alive_count == 0:
+                break
+
             # Rotate the dealer button
             found_next_alive_player = False
             while not found_next_alive_player:
                 self.dealer_button = (self.dealer_button + 1) % n_players
                 found_next_alive_player = self.player_list[self.dealer_button].game_status == 'alive'
 
-        print(f"Game ended at Hand {self.hand_count}. Winner: {winner}")
+        print(f"Game ended at Hand {self.hand_count}.")
+        print("------ RANKINGS ------")
+        self.player_list.sort(key=lambda p: p.rank)
+        for player in self.player_list:
+            print(f"No.{player.rank}   {player}                  - Finished at hand {player.finish_at}")
+

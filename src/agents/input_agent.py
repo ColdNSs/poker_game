@@ -1,5 +1,4 @@
 from .base_agent import BasePokerAgent
-import sys
 
 def prompt_confirm(prompt: str = None):
     if prompt is None:
@@ -219,7 +218,7 @@ class InputAgent(BasePokerAgent):
         spliced_status = splice(pretty_status, boundary_char)
         return spliced_status
 
-    def pretty_players(self, your_id: int, players, logs, boundary_char: str = "*"):
+    def pretty_players(self, your_id: int, players, logs, current_stage, boundary_char: str = "*"):
         dealer, sb ,bb, _ = get_positions(len(players))
         cost_action = ['ante',
                         'small-blind',
@@ -250,6 +249,7 @@ class InputAgent(BasePokerAgent):
             pretty_stack = f"Stack {self.chip2dollar(stack)}"
 
             recent_action = None
+            logs = [l for l in logs if l['stage'] == current_stage]
             for item in reversed(logs):
                 if item['player_id'] == player_id:
                     recent_action = item
@@ -323,11 +323,14 @@ class InputAgent(BasePokerAgent):
         pretty_players = self.pretty_start_players(your_id, players)
         pretty_print = pretty_print + pretty_players
 
+        level_one_big_blind = start_state['level_one_big_blind']
+        pretty_print.append(f"Big Blind at Level 1: {self.chip2dollar(level_one_big_blind)}")
+
         player_count = start_state['player_count']
         init_stack = start_state['initial_stack_per_player']
         pretty_print.append(f"{player_count} players in total. Each with {self.chip2dollar(init_stack)} initial stack.")
 
-        pretty_print.append(f"These are your enemies. Defeat them and win a million.")
+        pretty_print.append(f"These are your opponents. Defeat them and win a million.")
 
         for item in pretty_print:
             print(item)
@@ -350,7 +353,8 @@ class InputAgent(BasePokerAgent):
 
         players = game_state['players']
         logs = game_state['hand_log']
-        pretty_players = self.pretty_players(your_id, players, logs)
+        current_stage = game_state['current_stage']
+        pretty_players = self.pretty_players(your_id, players, logs, current_stage)
         pretty_print = pretty_print + pretty_players
 
         stage_pot = game_state['stage_pot']
@@ -373,7 +377,7 @@ class InputAgent(BasePokerAgent):
         pretty_pots = f"Total Pot {self.chip2dollar(total_pot)}" + pretty_pots
         pretty_print.append(pretty_pots)
 
-        pretty_community = f"{game_state['current_stage'].capitalize()}"
+        pretty_community = f"{current_stage.capitalize()}"
         community_cards = game_state['community_cards']
         if community_cards:
             pretty_community = pretty_community + ": "
