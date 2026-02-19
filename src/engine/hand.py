@@ -380,6 +380,12 @@ class Hand:
                         amount = max(action['amount'] - cost, min_raise)
                         # Raise
                         actual_raise = player.bet(stack, amount)
+
+                        # DEBUG
+                        # print("A raise!")
+                        # print(Card.print_pretty_cards(self.community_cards))
+                        # print(Card.print_pretty_cards(player.hole_cards))
+
                         # When it's a full raise
                         if actual_raise >= min_raise:
                             min_raise = actual_raise

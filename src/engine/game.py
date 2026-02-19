@@ -84,6 +84,33 @@ class PokerGame:
     def escalate(self):
         self.small_blind, self.big_blind, self.ante, self.big_blind_ante = self.escalator.get_blind_parameters(self.hand_count, self.alive_count)
 
+    def print_ranks(self):
+        for player in self.player_list:
+            assert player.rank
+        print(f"Game ended at Hand {self.hand_count}.")
+        print("------ RANKINGS ------")
+        self.player_list.sort(key=lambda p: p.rank)
+        for player in self.player_list:
+            print(f"No.{player.rank}   {player}                  - Finished at hand {player.finish_at}")
+
+    def get_results(self):
+        for player in self.player_list:
+            assert player.rank
+        game_id = self.game_id
+        game_seed = self.game_seed
+        for player in self.player_list:
+            agent_name = player.agent.name
+            rank = player.rank
+            hand_count = player.finish_at
+            result = {
+                'game_id': game_id,
+                'game_seed': game_seed,
+                'agent_name': agent_name,
+                'rank': rank,
+                'hand_count': hand_count
+            }
+            yield result
+
     def run_game(self):
         n_players = len(self.players)
         while True:
@@ -116,10 +143,4 @@ class PokerGame:
             while not found_next_alive_player:
                 self.dealer_button = (self.dealer_button + 1) % n_players
                 found_next_alive_player = self.player_list[self.dealer_button].game_status == 'alive'
-
-        print(f"Game ended at Hand {self.hand_count}.")
-        print("------ RANKINGS ------")
-        self.player_list.sort(key=lambda p: p.rank)
-        for player in self.player_list:
-            print(f"No.{player.rank}   {player}                  - Finished at hand {player.finish_at}")
 
