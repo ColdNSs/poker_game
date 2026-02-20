@@ -66,7 +66,7 @@ if __name__ == '__main__':
     # for result in results:
     #     print(result)
 
-    path = Path("../data/results.csv")
+    path = Path("../../data/results.csv")
 
     # Create directory if it doesn't exist
     path.parent.mkdir(parents=True, exist_ok=True)

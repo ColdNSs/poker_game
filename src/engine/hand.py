@@ -390,7 +390,7 @@ class Hand:
                         if actual_raise >= min_raise:
                             min_raise = actual_raise
                             # Open raise for everyone else
-                            for p in self.player_list:
+                            for p in self.get_active_players():
                                 if p is player:
                                     continue
                                 p.set_raise()

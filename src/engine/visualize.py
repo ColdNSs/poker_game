@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-SAVE_PATH = "../data"
+SAVE_PATH = "../../data"
 
 def load_data(path):
     return pd.read_csv(path)
@@ -81,7 +81,7 @@ def plot_win_counts(df):
     plt.close()
 
 def main():
-    df = load_data("../data/results.csv")
+    df = load_data("../../data/results.csv")
     # df = add_normalized_rank(df)
 
     plot_rank_distribution(df)
