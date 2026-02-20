@@ -20,7 +20,7 @@ Later, this project evolved from a joke-inspired curiosity into a structured sim
 
 Join me on this journey and see what we can find out.
 
----
+
 
 ## Engine Architecture
 
@@ -94,7 +94,7 @@ There are two special agents:
 
 All other agents are AI-generated strategy implementations.
 
----
+
 
 ## Who Generated the Strategies?
 
@@ -108,7 +108,7 @@ The participants:
 - **Claude Sonnet 4.6 Extended**
 - **Grok (on X)**
 
----
+
 
 ## Code Quality Observations
 
@@ -128,7 +128,7 @@ This demonstrates AI models' capability to generate robust API-compliant codes.
 
 But do they have the capability to produce robust Poker strategies too? Let's see.
 
----
+
 
 ## Simulation Setup
 
@@ -155,7 +155,7 @@ For each game, the following data was recorded:
 
 This allowed structured statistical analysis and visualization.
 
----
+
 
 ## Experiment Results
 
@@ -172,7 +172,7 @@ to make the chart readable, the y-axis was capped at 100, even though the actual
 ### Win Counts
 ![Win Counts](imgs/win_counts.png)
 
----
+
 
 ## Analysis
 
@@ -235,7 +235,7 @@ Its performance reflects this balance:
 - More stable than ChatGPT
 - Slightly less dominant than Gemini
 
----
+
 
 ## Results Summary
 
@@ -257,7 +257,7 @@ This reinforces a core tournament truth:
 - High aggression increases variance.
 - Variance occasionally produces first-place finishes.
 
----
+
 
 ## Takeaways
 
@@ -282,7 +282,7 @@ But the more interesting discovery is:
 
 > Strategy strength depends on the environment it lives in.
 
----
+
 
 ## Future Directions
 
